@@ -112,7 +112,11 @@ def test_no_cookies_no_external_resources(client, path):
     r = client.get(path)
     assert "Set-Cookie" not in r.headers
     html = r.get_data(as_text=True)
-    assert "http://" not in html and "https://" not in html
+    # Canonical / Open Graph / Twitter tags and JSON-LD are metadata for crawlers
+    # and must be absolute URLs; they load nothing. Everything else stays same-origin.
+    body = re.sub(r'<script type="application/ld\+json">.*?</script>', "", html, flags=re.S)
+    body = re.sub(r'<(?:meta\b|link rel="canonical")[^>]*>', "", body)
+    assert "http://" not in body and "https://" not in body
     assert "<script>" not in html  # no inline script
     assert "analytics" not in html.lower()
     assert "script-src 'self'" in r.headers["Content-Security-Policy"]
@@ -353,3 +357,4 @@ def test_robots_and_sitemap_stay_open_when_locked(app, client):
     _age_trial(app, 41)
     assert client.get("/robots.txt").status_code == 200
     assert client.get("/sitemap.xml").status_code == 200
+
