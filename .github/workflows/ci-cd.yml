@@ -1,0 +1,57 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2          # lets the deploy step spot requirements.txt changes
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: |
+          pip install -r requirements.txt pytest
+      - name: Syntax check
+        run: python -m compileall -q app.py admin.py trial.py content.py scripts
+      - name: Tests
+        run: python -m pytest -q
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production      # add a required reviewer in GitHub if you want a manual approval step
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests
+      - name: Upload to PythonAnywhere and reload
+        env:
+          PA_USERNAME: ${{ secrets.PA_USERNAME }}
+          PA_TOKEN: ${{ secrets.PA_TOKEN }}
+          PA_DOMAIN: ${{ secrets.PA_DOMAIN }}        # e.g. yourname.pythonanywhere.com
+          PA_APP_DIR: ${{ vars.PA_APP_DIR }}         # e.g. mapenzi-response (folder under /home/<user>/)
+          PA_HOST: ${{ vars.PA_HOST }}               # optional: eu.pythonanywhere.com (default www.pythonanywhere.com)
+          SITE_URL: https://${{ secrets.PA_DOMAIN }}
+        run: python scripts/deploy_pythonanywhere.py

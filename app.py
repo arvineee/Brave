@@ -207,6 +207,7 @@ def create_app(config=None):
         MAX_CONTENT_LENGTH=4096,
         LICENSE_SECRET=os.environ.get("LICENSE_SECRET", ""),  # server env only, never in the repo
         TRIAL_DAYS=int(os.environ.get("TRIAL_DAYS", "40")),
+        SITE_URL=os.environ.get("SITE_URL", "").rstrip("/"),  # e.g. https://mapenzi.example.org
     )
     if config:
         app.config.update(config)
@@ -221,7 +222,7 @@ def create_app(config=None):
     @app.before_request
     def gate():
         ep = request.endpoint
-        if ep in (None, "static", "locked", "unlock"):
+        if ep in (None, "static", "locked", "unlock", "robots", "sitemap"):
             return None
         try:
             state = read_state(app.config["LICENSE_SECRET"], app.config["TRIAL_DAYS"])
@@ -263,6 +264,44 @@ def create_app(config=None):
         failed_keys.append(now)
         return render_template("locked.html", crisis=CRISIS, site=SITE, L=LOCKED,
                                error=LOCKED["wrong_key"]), 403
+
+    NOINDEX_ENDPOINTS = {"response", "locked", "unlock", "api_checkin"}
+
+    def site_url():
+        return app.config["SITE_URL"] or request.url_root.rstrip("/")
+
+    @app.context_processor
+    def seo_context():
+        base = site_url()
+        return {
+            "site_url": base,
+            "canonical_url": base + request.path,  # no query string: /?utm=x is the same page
+            "jsonld": {
+                "@context": "https://schema.org",
+                "@graph": [
+                    {"@type": "Organization", "@id": base + "/#org", "name": SITE["org"],
+                     "brand": "#IAMBRAVE", "url": base + "/",
+                     "logo": base + url_for("static", filename="brave-logo.svg"),
+                     "address": {"@type": "PostalAddress", "addressRegion": "Murang'a County",
+                                 "addressCountry": "KE"}},
+                    {"@type": "WebSite", "@id": base + "/#site", "url": base + "/",
+                     "name": "Mapenzi ya 30", "inLanguage": "en-KE",
+                     "publisher": {"@id": base + "/#org"}},
+                ],
+            },
+        }
+
+    @app.get("/robots.txt")
+    def robots():
+        body = f"User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: {site_url()}/sitemap.xml\n"
+        return app.response_class(body, mimetype="text/plain")
+
+    @app.get("/sitemap.xml")
+    def sitemap():
+        urls = "".join(f"  <url><loc>{site_url()}{p}</loc></url>\n" for p in ("/", "/checkin"))
+        body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls + "</urlset>\n")
+        return app.response_class(body, mimetype="application/xml")
 
     @app.route("/")
     def home():
@@ -320,6 +359,8 @@ def create_app(config=None):
             "img-src 'self' data:; connect-src 'self'; base-uri 'none'; "
             "form-action 'self'; frame-ancestors 'none'"
         )
+        if request.endpoint in NOINDEX_ENDPOINTS:  # private result pages never go in search
+            resp.headers["X-Robots-Tag"] = "noindex, nofollow"
         if request.endpoint == "static":
             resp.headers["Cache-Control"] = "public, max-age=3600"
         else:  # pages differ by query string; keep them out of shared caches
