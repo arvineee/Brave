@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0d9488">
+  <meta name="description" content="Mapenzi ya 30: a private weekly wellness check-in for students, by #IAMBRAVE / Jagora.">
+  <title>{% block title %}Mapenzi ya 30 | #IAMBRAVE{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brave-mark.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="logo-link" href="{{ url_for('home') }}" aria-label="Brave #IAMBRAVE, home">
+        {% include "_logo.html" %}
+      </a>
+      <nav class="nav" aria-label="Main">
+        <a class="nav-link" href="{{ url_for('checkin') }}">Check-in</a>
+        <a class="nav-help" href="#crisis">Get help</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-brand">
+        {% with %}{% include "_logo.html" %}{% endwith %}
+      </div>
+      <p class="footer-text">Mapenzi ya 30 is a #IAMBRAVE initiative by {{ site.org }}, {{ site.place }}.</p>
+      <p class="footer-text">Anonymous check-in &bull; No login &bull; No cookies &bull; No tracking</p>
+      <p class="footer-small">Brave | #IAMBRAVE | Kenya</p>
+    </div>
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Weekly check-in | Mapenzi ya 30 | #IAMBRAVE{% endblock %}
+{% block content %}
+<div class="wrap narrow">
+  <header class="page-head">
+    <p class="eyebrow">Mapenzi ya 30</p>
+    <h1>Weekly mental wellness check-in</h1>
+    <p class="lead-dark">Less than 3 minutes. We never ask for your name, and what you write in the
+      reflection boxes stays on your phone.</p>
+  </header>
+
+  {# Only the connection radios and the preview score carry a name, so a no-JavaScript submit never puts personal text in the URL. #}
+  <form id="checkin-form" action="{{ url_for('response') }}" method="get"
+        data-response-url="{{ url_for('response') }}" data-api-url="{{ url_for('api_checkin') }}"
+        data-wants-support="{{ wants_support | join('|') }}">
+    <input type="hidden" name="score" value="3">
+
+    <fieldset class="panel">
+      <legend class="panel-title"><span class="panel-num">1</span>Daily Check-in</legend>
+
+      <div class="field">
+        <label for="q1">1. How&rsquo;s your energy today &ndash; honestly? <span class="req" aria-hidden="true">*</span></label>
+        <select id="q1" required>
+          <option value="" disabled selected>Select an option</option>
+          {% for o in f.energy %}<option value="{{ o[1] }}">{{ o[0] }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <div class="field-label" id="q2-label">2. How connected do you feel to people at school right now? <span class="req" aria-hidden="true">*</span></div>
+        <div class="scale" role="radiogroup" aria-labelledby="q2-label">
+          {% for n in range(11) %}
+          <label class="pill"><input type="radio" name="connection" value="{{ n }}" {% if n == 0 %}required{% endif %}><span>{{ n }}</span></label>
+          {% endfor %}
+        </div>
+        <div class="scale-ends"><span>0: Not at all</span><span>10: I have a lot of friends</span></div>
+      </div>
+    </fieldset>
+
+    <fieldset class="panel">
+      <legend class="panel-title"><span class="panel-num">2</span>Sleep &amp; Rest</legend>
+
+      <div class="field">
+        <label for="q3">3. How many hours of sleep did you get last night? <span class="req" aria-hidden="true">*</span></label>
+        <select id="q3" required>
+          <option value="" disabled selected>Select hours</option>
+          {% for o in f.sleep %}<option value="{{ o[1] }}">{{ o[0] }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <div class="field-label" id="q4-label">4. What mainly kept you up? <span class="req" aria-hidden="true">*</span></div>
+        <div class="checks" role="group" aria-labelledby="q4-label">
+          {% for o in f.kept_up %}
+          <label class="check"><input type="checkbox" data-points="{{ o[1] }}" data-label="{{ o[0] }}" required><span>{{ o[0] }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="panel">
+      <legend class="panel-title"><span class="panel-num">3</span>Weekly Reflection</legend>
+      <p class="note">What you write here is private. It stays on your phone and is never saved or sent.</p>
+
+      <div class="field">
+        <label for="q5">5. One small win from this week &ndash; anything counts <span class="req" aria-hidden="true">*</span></label>
+        <textarea id="q5" rows="3" placeholder="Type your reflection here..." required></textarea>
+      </div>
+
+      <div class="field">
+        <label for="q6">6. What made this week feel heavy? <span class="req" aria-hidden="true">*</span></label>
+        <textarea id="q6" rows="3" placeholder="Type your reflection here..." required></textarea>
+      </div>
+    </fieldset>
+
+    <fieldset class="panel">
+      <legend class="panel-title"><span class="panel-num">4</span>Support</legend>
+
+      <div class="field">
+        <label for="q7">7. Would you like any mental wellness support right now? <span class="req" aria-hidden="true">*</span></label>
+        <select id="q7" required>
+          <option value="" disabled selected>Select an option</option>
+          {% for o in f.support_now %}<option value="{{ o[1] }}">{{ o[0] }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div id="support-extra">
+        <div class="field">
+          <label for="q8">8. What kind of support would help most right now? <span class="req" aria-hidden="true">*</span></label>
+          <select id="q8">
+            <option value="" disabled selected>Select support type</option>
+            {% for o in f.support_type %}<option value="{{ o[1] }}">{{ o[0] }}</option>{% endfor %}
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="q9">9. How should support reach you? <span class="req" aria-hidden="true">*</span></label>
+          <select id="q9">
+            <option value="" disabled selected>Select channel</option>
+            {% for o in f.channel %}<option value="{{ o[1] }}">{{ o[0] }}</option>{% endfor %}
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="q10">10. Best contact to reach you on <span class="opt">(optional)</span></label>
+          <input id="q10" type="text" maxlength="120" autocomplete="off" placeholder="Phone number, handle or email">
+          <label class="check consent">
+            <input id="consent" type="checkbox"><span>I agree that Brave may contact me using the details above. They are
+              saved separately from my answers and used only to reach me.</span>
+          </label>
+          <p class="note">Leave this blank if you would rather not be contacted. You will still get your response.</p>
+        </div>
+      </div>
+    </fieldset>
+
+    <button id="submit-btn" type="submit" class="btn btn-solid btn-block">Submit Check-in</button>
+    <p class="fine-print">Your response is worked out on your phone. We save only your score and
+      multiple-choice answers, never your name or what you write.</p>
+  </form>
+
+  {% with highlight=false %}{% include "_crisis.html" %}{% endwith %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='scoring.js') }}"></script>
+<script src="{{ url_for('static', filename='checkin.js') }}"></script>
+{% endblock %}

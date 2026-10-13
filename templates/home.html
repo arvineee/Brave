@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow eyebrow-light">{{ site.eyebrow }}</p>
+      <h1>{{ site.hero_title }}</h1>
+      <p class="lead">{{ site.hero_lead }}</p>
+      <div class="cta-row">
+        <a class="btn btn-light" href="{{ url_for('checkin') }}">Start your check-in</a>
+        <a class="btn btn-ghost" href="#crisis">I need help now</a>
+      </div>
+      <p class="hero-note">Less than 3 minutes &bull; No login &bull; Private</p>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <svg viewBox="0 0 240 240" focusable="false">
+        <circle class="art-ring" cx="120" cy="120" r="112"/>
+        <circle class="art-disc" cx="120" cy="120" r="84"/>
+        <path class="art-bubble" d="M90 66H150A28 28 0 0 1 178 94V128A28 28 0 0 1 150 156H108L72 184L78 156H90A28 28 0 0 1 62 128V94A28 28 0 0 1 90 66Z"/>
+        <path class="art-heart" d="M120 134C120 134 92 117 92 98C92 88 99 82 107 82C112 82 117 85 120 89C123 85 128 82 133 82C141 82 148 88 148 98C148 117 120 134 120 134Z"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <p class="eyebrow">How it works</p>
+    <h2>Three simple steps</h2>
+    <ol class="steps">
+      {% for title, text in site.steps %}
+      <li class="step">
+        <span class="step-num">{{ loop.index }}</span>
+        <h3>{{ title }}</h3>
+        <p>{{ text }}</p>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+
+<section class="section section-tint">
+  <div class="wrap">
+    <p class="eyebrow">Your privacy</p>
+    <h2>Private by design</h2>
+    <ul class="privacy-list">
+      {% for title, text in site.privacy %}
+      <li>
+        <span class="tick" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false"><path d="M9.5 16.2 5.3 12l-1.4 1.4 5.6 5.6L20.1 8.4 18.7 7z"/></svg>
+        </span>
+        <div><h3>{{ title }}</h3><p>{{ text }}</p></div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap narrow-text">
+    <p class="eyebrow">About</p>
+    <h2>Why #IAMBRAVE exists</h2>
+    <p class="about">{{ site.about }}</p>
+    <a class="btn btn-solid" href="{{ url_for('checkin') }}">Start your check-in</a>
+  </div>
+</section>
+
+<div class="wrap crisis-wrap">
+  {% with highlight=false %}{% include "_crisis.html" %}{% endwith %}
+</div>
+{% endblock %}
