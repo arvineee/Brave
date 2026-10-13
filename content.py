@@ -70,6 +70,18 @@ RESPONSES = {
     },
 }
 
+LOCKED = {
+    "title": "Mapenzi ya 30 is paused for now",
+    "message": "The weekly check-in is not available right now. Support is still here "
+    "for you, and the numbers below work at any time.",
+    "admin_heading": "Site administrator",
+    "admin_help": "Enter the licence key to continue using the site.",
+    "key_label": "Licence key",
+    "button": "Unlock",
+    "wrong_key": "That key was not accepted. Please check it and try again.",
+    "too_many": "Too many attempts. Please wait a few minutes and try again.",
+}
+
 CRISIS = {
     "heading": "Support Is Always Available",
     "intro": "If things feel too heavy or you need someone to talk to right now, "

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ L.title }} | #IAMBRAVE{% endblock %}
+{% block content %}
+<div class="wrap narrow">
+  <header class="page-head">
+    <p class="eyebrow">Mapenzi ya 30</p>
+    <h1>{{ L.title }}</h1>
+    <p>{{ L.message }}</p>
+  </header>
+
+  {% with highlight=true %}{% include "_crisis.html" %}{% endwith %}
+
+  <section class="field" aria-labelledby="unlock-title">
+    <h2 id="unlock-title">{{ L.admin_heading }}</h2>
+    <p class="note">{{ L.admin_help }}</p>
+    {% if error %}<p class="note" role="alert">{{ error }}</p>{% endif %}
+    <form method="post" action="{{ url_for('unlock') }}" autocomplete="off">
+      <label for="key">{{ L.key_label }}</label>
+      <input id="key" name="key" type="text" maxlength="40" autocomplete="off" required>
+      <button type="submit" class="btn btn-solid btn-block">{{ L.button }}</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

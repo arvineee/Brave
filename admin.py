@@ -3,13 +3,18 @@
     python admin.py stats                 totals, scores per level, per day
     python admin.py requests              support requests (contains contacts!)
     python admin.py purge --days 30       delete support requests older than N days
+    python admin.py license               trial status, days left, install id
+    python admin.py starttrial            start the clock on a site that already has check-ins
+    python admin.py genkey                print the activation key for this install
+                                          (needs LICENSE_SECRET in the environment)
 """
 import argparse
 from datetime import datetime, timedelta
 
 from sqlalchemy import func
 
-from app import EAT, Checkin, SupportRequest, app, db
+import trial
+from app import EAT, Checkin, SupportRequest, app, db, read_state, start_trial, License
 
 
 def stats():
@@ -37,11 +42,43 @@ def purge(days):
     print(f"Deleted {n} support request(s) older than {days} days.")
 
 
+def license_():
+    s = read_state(app.config["LICENSE_SECRET"], app.config["TRIAL_DAYS"])
+    print(f"State: {s['reason']}  (site {'open' if s['open'] else 'LOCKED'})")
+    if s["reason"] == "trial":
+        print(f"Days left: {s['days_left']}")
+    row = db.session.get(License, 1)
+    if row:
+        print(f"Install id: {row.install_id}\nStarted:    {row.started_at}")
+
+
+def starttrial():
+    """Only needed when check-ins already exist but there is no licence row (first upgrade)."""
+    secret = app.config["LICENSE_SECRET"]
+    if not secret:
+        raise SystemExit("Set LICENSE_SECRET first.")
+    if db.session.get(License, 1):
+        raise SystemExit("A trial already exists; nothing changed.")
+    start_trial(secret)
+    license_()
+
+
+def genkey():
+    secret = app.config["LICENSE_SECRET"]
+    row = db.session.get(License, 1)
+    if not secret or row is None:
+        raise SystemExit("Set LICENSE_SECRET and start the app once first.")
+    print(trial.activation_key(secret, row.install_id))
+
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("stats")
     sub.add_parser("requests")
+    sub.add_parser("license")
+    sub.add_parser("genkey")
+    sub.add_parser("starttrial")
     pg = sub.add_parser("purge")
     pg.add_argument("--days", type=int, required=True)
     a = p.parse_args()
@@ -50,5 +87,11 @@ if __name__ == "__main__":
             stats()
         elif a.cmd == "requests":
             requests_()
+        elif a.cmd == "license":
+            license_()
+        elif a.cmd == "starttrial":
+            starttrial()
+        elif a.cmd == "genkey":
+            genkey()
         else:
             purge(a.days)

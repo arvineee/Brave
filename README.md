@@ -40,3 +40,18 @@ All text is in `content.py`.
 
 ## Test
     pip install pytest && pytest
+
+## 40-day trial and licence key
+* Set `LICENSE_SECRET` in the server environment (PythonAnywhere: WSGI file or `.env`). Never
+  commit it. The trial clock starts the first time the app runs with the secret set, so set it
+  when you hand the site over. Without the secret the app is locked (fails closed).
+* After `TRIAL_DAYS` (default 40) every page except `/locked`, static files and the
+  score-5 crisis response redirects to `/locked`. Crisis resources are always on that page.
+* If the site already has check-ins when you add this, run `python admin.py starttrial` once
+  (a missing row with existing check-ins is otherwise treated as tampering).
+* `python admin.py license` shows days left. `python admin.py genkey` prints the key for this
+  install: give it to the client when they pay, they type it on `/locked`.
+* The `license` row is HMAC-signed with the secret and protected by DB triggers (no delete,
+  no changing the start date, no un-activating). Hand-editing it locks the site.
+* Limits: this deters casual tampering; anyone who can edit the code or the server environment
+  can still remove the gate, and a DB superuser can drop the triggers (the signature still holds).
