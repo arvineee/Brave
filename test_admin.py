@@ -30,7 +30,8 @@ def client(app):
 def admin(client):
     r = client.post("/admin/login", data={"password": PASSWORD})
     assert r.status_code == 302
-    with client.session_transaction() as s:
+    # The login cookie is scoped to Path=/admin, so the test client only sends it for /admin URLs.
+    with client.session_transaction(path="/admin/") as s:
         token = s["csrf"]
     client.csrf = token
     return client
@@ -323,3 +324,4 @@ def test_admin_is_locked_with_the_rest_of_the_site_when_the_trial_ends(app, admi
     _age_trial(app, 41)
     r = admin.get("/admin/")
     assert r.status_code == 302 and "/locked" in r.headers["Location"]
+
