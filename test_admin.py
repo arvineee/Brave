@@ -396,3 +396,32 @@ def test_report_bad_or_reversed_dates_fall_back_safely(admin):
     csv = admin.get("/admin/report.csv?from=2026-10-31&to=2026-10-01").get_data(as_text=True)
     assert "From,2026-10-01" in csv and "To,2026-10-31" in csv
     assert admin.get("/admin/report").status_code == 200  # no dates at all: this month
+
+
+def test_several_helplines_each_show_with_its_own_call_button(admin):
+    r = post(admin, "/admin/contacts", section="crisis", name=["Befrienders Kenya", "Kenya Red Cross"],
+             phone_display=["0722 178 177", "1199"],
+             counsellor_prompt="Speak to your campus counsellor in confidence.",
+             footer_tag="#IAMBRAVE • Murang'a County")
+    assert r.status_code == 302
+    for path in ("/", "/response?score=5"):
+        html = admin.get(path).get_data(as_text=True)
+        assert "Kenya Red Cross" in html and 'href="tel:+254722178177"' in html
+        assert 'href="tel:1199"' in html and "0722 178 177" in html
+    assert "Helpline 2" in admin.get("/admin/contacts").get_data(as_text=True)
+
+
+def test_too_many_or_empty_helplines_are_refused(admin):
+    post(admin, "/admin/contacts", section="crisis", name=["Line A", "Line B", "Line C", "Line D", "Line E"],
+         phone_display=["0700 000 001", "0700 000 002", "0700 000 003", "0700 000 004", "0700 000 005"],
+         counsellor_prompt="Speak to your campus counsellor.", footer_tag="#IAMBRAVE")
+    html = admin.get("/").get_data(as_text=True)
+    assert "Line A" not in html and "0722 178 177" in html
+    post(admin, "/admin/contacts", section="crisis", name=["", ""], phone_display=["", ""],
+         counsellor_prompt="Speak to your campus counsellor.", footer_tag="#IAMBRAVE")
+    assert "0722 178 177" in admin.get("/").get_data(as_text=True)
+
+
+def test_qr_code_has_the_iambrave_tag_underneath(admin):
+    assert b"#IAMBRAVE" in admin.get("/admin/qr.svg").get_data()
+    assert b"#IAMBRAVE" in admin.get("/admin/qr/download.svg").get_data()

@@ -5,8 +5,10 @@
   <div class="crisis-body">
     <h2 id="crisis-title">{{ crisis.heading }}</h2>
     <p>{{ crisis.intro }}</p>
-    <p class="crisis-contact">{{ crisis.name }}: <span class="phone-text">{{ crisis.phone_display }}</span></p>
-    <a class="btn btn-light" href="tel:{{ crisis.phone_tel }}">Call {{ crisis.phone_display }}</a>
+    {% for h in crisis.helplines %}
+    <p class="crisis-contact">{{ h.name }}: <span class="phone-text">{{ h.phone_display }}</span></p>
+    <a class="btn btn-light" href="tel:{{ h.phone_tel }}">Call {{ h.phone_display }}</a>
+    {% endfor %}
     <p class="crisis-counsellor">{{ crisis.counsellor_prompt }}</p>
     <p class="crisis-tag">{{ crisis.footer_tag }}</p>
   </div>

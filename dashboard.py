@@ -57,18 +57,31 @@ class Deps:
 part_of_day = stats.part_of_day  # one definition, shared with the reports
 
 
+QR_TAG = "#IAMBRAVE"  # printed under every QR code
+
+
 def qr_svg(url):
-    """The QR code for `url` as SVG bytes. Drawn on the server, so no outside service is used."""
-    qr = segno.make(url, error="m")
-    buf = io.BytesIO()
-    qr.save(buf, kind="svg", scale=8, border=4, dark="#000000", light="#ffffff")
-    return buf.getvalue()
-
-
-def csv_safe(v):
-    """Stop spreadsheet programs treating a cell as a formula."""
-    s = "" if v is None else str(v)
-    return "'" + s if s[:1] in ("=", "+", "-", "@") else s
+    """The QR code for `url`, with QR_TAG printed underneath, as SVG bytes.
+    Drawn on the server, so no outside service is used."""
+    matrix = segno.make(url, error="m").matrix      # 1 = dark module, no quiet zone
+    n, border, label = len(matrix), 4, 10             # modules; quiet zone; space for the tag
+    size = n + 2 * border
+    cells = []
+    for y, row in enumerate(matrix):
+        for x, dark in enumerate(row):
+            if dark:
+                cells.append(f"M{x + border} {y + border}h1v1h-1z")
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size + label}" '
+        f'width="{size * 8}" height="{(size + label) * 8}">'
+        f'<rect width="100%" height="100%" fill="#ffffff"/>'
+        f'<path fill="#000000" d="{"".join(cells)}"/>'
+        f'<text x="{size / 2}" y="{size + label - 3}" text-anchor="middle" '
+        f'font-family="Arial, Helvetica, sans-serif" font-size="6" font-weight="bold" '
+        f'fill="#000000">{QR_TAG}</text>'
+        f'</svg>'
+    )
+    return svg.encode("utf-8")
 
 
 def register(app, d):
@@ -423,8 +436,13 @@ def register(app, d):
         cfg = d.get_config()
         blanks = max(2, 3 - len(cfg["socials"]))
         rows = cfg["socials"] + [{"platform": "", "label": "", "url": ""}] * blanks
+        helplines = cfg["crisis"]["helplines"]
+        spare = max(1, min(2, siteconfig.MAX_HELPLINES - len(helplines)))
+        help_rows = (helplines + [{"name": "", "phone_display": "", "phone_tel": ""}] * spare)
         return page("contacts.html", "contacts", cfg=cfg, rows=rows[:siteconfig.MAX_SOCIALS],
-                    platforms=content.SOCIAL_PLATFORMS, max_socials=siteconfig.MAX_SOCIALS)
+                    platforms=content.SOCIAL_PLATFORMS, max_socials=siteconfig.MAX_SOCIALS,
+                    helplines=help_rows[:siteconfig.MAX_HELPLINES],
+                    max_helplines=siteconfig.MAX_HELPLINES)
 
     @app.post("/admin/contacts")
     @admin_only

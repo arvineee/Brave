@@ -89,6 +89,8 @@ CRISIS = {
     "name": "Befrienders Kenya",
     "phone_display": "0722 178 177",
     "phone_tel": "+254722178177",
+    "helplines": [{"name": "Befrienders Kenya", "phone_display": "0722 178 177",
+                   "phone_tel": "+254722178177"}],
     "counsellor_prompt": "You can also speak confidentially to your campus counsellor.",
     "footer_tag": "#IAMBRAVE • Murang'a County",
 }

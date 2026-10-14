@@ -4,20 +4,26 @@
 <h1 class="adm-h1">Contacts &amp; socials</h1>
 
 <section class="adm-card adm-crisis-card" aria-labelledby="cr-h">
-  <h2 class="adm-h2" id="cr-h">Crisis helpline</h2>
-  <p class="adm-note">This box appears on <strong>every</strong> page, and first on the crisis response. A wrong number here could keep a student in danger from getting help, so after saving, tap the call button below to check it.</p>
+  <h2 class="adm-h2" id="cr-h">Crisis helplines</h2>
+  <p class="adm-note">These helplines appear on <strong>every</strong> page, and first on the crisis response. Each one gets its own call button, in the order listed. Up to {{ max_helplines }}. A wrong number here could keep a student in danger from getting help, so after saving, tap each test call below to check it.</p>
   <form method="post" action="{{ url_for('admin_contacts_save') }}">
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="section" value="crisis">
-    <label class="adm-label" for="c-name">Helpline name</label>
-    <input class="adm-input" id="c-name" name="name" value="{{ cfg.crisis.name }}" maxlength="60" required>
-    <label class="adm-label" for="c-phone">Helpline number</label>
-    <input class="adm-input" id="c-phone" name="phone_display" value="{{ cfg.crisis.phone_display }}" maxlength="30" inputmode="tel" required>
-    <p class="adm-muted">Type it the way students should read it, e.g. 0722 178 177. The dialling number is worked out for you: <strong>{{ cfg.crisis.phone_tel }}</strong> &middot; <a href="tel:{{ cfg.crisis.phone_tel }}">test call</a></p>
+    {% for h in helplines %}
+    <fieldset class="adm-q">
+      <legend>Helpline {{ loop.index }}</legend>
+      <label class="adm-label" for="hn{{ loop.index }}">Helpline name</label>
+      <input class="adm-input" id="hn{{ loop.index }}" name="name" value="{{ h.name }}" maxlength="60" autocomplete="off">
+      <label class="adm-label" for="hp{{ loop.index }}">Helpline number <span class="adm-muted">(as students should read it, e.g. 0722 178 177)</span></label>
+      <input class="adm-input" id="hp{{ loop.index }}" name="phone_display" value="{{ h.phone_display }}" maxlength="30" inputmode="tel" autocomplete="off">
+      {% if h.phone_tel %}<p class="adm-muted">Dialling number: <strong>{{ h.phone_tel }}</strong> &middot; <a href="tel:{{ h.phone_tel }}">test call</a></p>{% endif %}
+    </fieldset>
+    {% endfor %}
+    <p class="adm-muted">To remove a helpline, clear both of its boxes and save. At least one helpline is needed.</p>
     <label class="adm-label" for="c-couns">Campus counsellor message</label>
     <textarea class="adm-input" id="c-couns" name="counsellor_prompt" rows="2" maxlength="200" required>{{ cfg.crisis.counsellor_prompt }}</textarea>
     <label class="adm-label" for="c-tag">Footer tag</label>
     <input class="adm-input" id="c-tag" name="footer_tag" value="{{ cfg.crisis.footer_tag }}" maxlength="60" required>
-    <button class="btn btn-solid btn-block" type="submit">Save helpline details</button>
+    <button class="btn btn-solid btn-block" type="submit">Save helplines</button>
   </form>
 </section>
 

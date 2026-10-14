@@ -21,6 +21,7 @@ CUSTOM_KINDS = {"choice": "Pick one", "multi": "Pick any that apply", "scale": "
 MAX_CUSTOM = 10          # active extra questions on the form
 MAX_OPTIONS = 12
 MAX_SOCIALS = 8
+MAX_HELPLINES = 4
 
 _EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[^@\s]{2,}$")
 
@@ -89,6 +90,11 @@ def _build(settings, custom_rows):
     tel = stored.get("phone_tel")
     if isinstance(tel, str) and re.fullmatch(r"\+?\d{3,15}", tel):
         crisis["phone_tel"] = tel
+    helplines = stored_helplines(stored.get("helplines"))
+    if not helplines:  # never saved with several helplines: use the single one
+        helplines = [{"name": crisis["name"], "phone_display": crisis["phone_display"],
+                      "phone_tel": crisis["phone_tel"]}]
+    crisis["helplines"] = helplines
 
     contacts = dict(content.CONTACTS)
     stored = _json(settings.get("contacts"), {})
@@ -180,24 +186,57 @@ def clean_labels(form):
     return out, errors
 
 
+def stored_helplines(raw):
+    """Stored list -> valid helplines (name, phone_display, phone_tel), or None."""
+    if not isinstance(raw, list):
+        return None
+    out = []
+    for h in raw[:MAX_HELPLINES]:
+        if not isinstance(h, dict):
+            continue
+        name, phone = _text(h.get("name"), 2, 60), normalise_phone(h.get("phone_display"))
+        if name and phone:
+            out.append({"name": name, "phone_display": phone[0], "phone_tel": phone[1]})
+    return out or None
+
+
+def clean_helplines(form):
+    """form.getlist-like: 'name' and 'phone_display' come as parallel lists, one per helpline.
+    Blank rows are ignored. Returns (list, errors)."""
+    names, phones = form.getlist("name"), form.getlist("phone_display")
+    out, errors = [], []
+    for i in range(max(len(names), len(phones))):
+        name = (names[i] if i < len(names) else "").strip()
+        phone = (phones[i] if i < len(phones) else "").strip()
+        if not name and not phone:
+            continue
+        n, p = _text(name, 2, 60), normalise_phone(phone)
+        if not n:
+            errors.append(f"Helpline {i + 1}: give its name (2 to 60 characters).")
+        elif not p:
+            errors.append(f"Helpline {i + 1}: the number must be a real phone number, "
+                          "for example 0722 178 177.")
+        else:
+            out.append({"name": n, "phone_display": p[0], "phone_tel": p[1]})
+    if not out and not errors:
+        errors.append("Add at least one helpline.")
+    if len(out) > MAX_HELPLINES:
+        errors.append(f"At most {MAX_HELPLINES} helplines.")
+    return out, errors
+
+
 def clean_crisis(form):
-    errors = []
-    name = _text(form.get("name"), 2, 60)
+    """Helplines (form lists 'name' and 'phone_display') plus the counsellor and footer wording."""
+    helplines, errors = clean_helplines(form)
     counsellor = _text(form.get("counsellor_prompt"), 5, 200)
     tag = _text(form.get("footer_tag"), 3, 60)
-    phone = normalise_phone(form.get("phone_display"))
-    if not name:
-        errors.append("Helpline name is required.")
-    if not phone:
-        errors.append("The helpline number must be a real phone number, for example 0722 178 177.")
     if not counsellor:
         errors.append("The campus counsellor message is required.")
     if not tag:
         errors.append("The footer tag is required.")
     if errors:
         return None, errors
-    return {"name": name, "phone_display": phone[0], "phone_tel": phone[1],
-            "counsellor_prompt": counsellor, "footer_tag": tag}, []
+    return {"helplines": helplines, "counsellor_prompt": counsellor, "footer_tag": tag}, []
 
 
 def clean_contacts(form):
