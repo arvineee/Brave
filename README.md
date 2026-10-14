@@ -40,3 +40,45 @@ All text is in `content.py`.
 
 ## Test
     pip install pytest && pytest
+
+## 40-day trial and licence key
+* Set `LICENSE_SECRET` in the server environment (PythonAnywhere: WSGI file or `.env`). Never
+  commit it. The trial clock starts the first time the app runs with the secret set, so set it
+  when you hand the site over. Without the secret the app is locked (fails closed).
+* After `TRIAL_DAYS` (default 40) every page except `/locked`, static files and the
+  score-5 crisis response redirects to `/locked`. Crisis resources are always on that page.
+* If the site already has check-ins when you add this, run `python admin.py starttrial` once
+  (a missing row with existing check-ins is otherwise treated as tampering).
+* `python admin.py license` shows days left. `python admin.py genkey` prints the key for this
+  install: give it to the client when they pay, they type it on `/locked`.
+* The `license` row is HMAC-signed with the secret and protected by DB triggers (no delete,
+  no changing the start date, no un-activating). Hand-editing it locks the site.
+* Limits: this deters casual tampering; anyone who can edit the code or the server environment
+  can still remove the gate, and a DB superuser can drop the triggers (the signature still holds).
+
+## SEO
+* Indexable: `/` and `/checkin` (unique title, description, canonical, Open Graph, Twitter card;
+  JSON-LD Organization + WebSite on the home page). Private pages (`/response`, `/locked`,
+  `/unlock`, `/api/*`) send `noindex` via meta tag and `X-Robots-Tag`.
+* `/robots.txt` and `/sitemap.xml` are generated, and stay reachable even when the trial has locked.
+* Set `SITE_URL` (e.g. `https://yourname.pythonanywhere.com`) in the environment so canonical
+  links and the sitemap always use the real domain.
+* After going live: add the site in Google Search Console, submit `/sitemap.xml`, and check the
+  home page in the Rich Results Test and a social share preview.
+
+## CI/CD (GitHub Actions to PythonAnywhere)
+`.github/workflows/ci-cd.yml`: every push and pull request runs the syntax check and `pytest`.
+A push to `main`/`master` that passes then uploads the tracked files through the PythonAnywhere
+API, reloads the web app and checks `/robots.txt` returns 200.
+
+One-time setup
+1. PythonAnywhere: **Account, API token**, create a token.
+2. GitHub repo, **Settings, Secrets and variables, Actions**:
+   * Secrets: `PA_USERNAME`, `PA_TOKEN`, `PA_DOMAIN` (e.g. `yourname.pythonanywhere.com`)
+   * Variables: `PA_APP_DIR` (folder under `/home/<user>/`), optional `PA_HOST` (`eu.pythonanywhere.com` if your account is on the EU server)
+3. Optional: **Settings, Environments, production**, add a required reviewer for manual approval.
+
+Notes
+* `LICENSE_SECRET`, `SITE_URL` and the database stay on the server; the pipeline never sends them.
+* Deleted files are not removed on the server. New dependencies need `pip install -r requirements.txt` in a PythonAnywhere console (the job prints a warning when `requirements.txt` changes).
+* Test locally without uploading: `python scripts/deploy_pythonanywhere.py --dry-run`.

@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex, nofollow">
+  <meta name="robots" content="{% block robots %}noindex, nofollow{% endblock %}">
   <meta name="theme-color" content="#0d9488">
-  <meta name="description" content="Mapenzi ya 30: a private weekly wellness check-in for students, by #IAMBRAVE / Jagora.">
+  <meta name="description" content="{% block description %}Mapenzi ya 30: a private weekly wellness check-in for students, by #IAMBRAVE / Jagora.{% endblock %}">
   <title>{% block title %}Mapenzi ya 30 | #IAMBRAVE{% endblock %}</title>
+  {% block seo %}{% endblock %}
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brave-mark.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>

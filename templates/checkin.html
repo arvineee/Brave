@@ -1,5 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Weekly check-in | Mapenzi ya 30 | #IAMBRAVE{% endblock %}
+{% set seo_title = "Weekly Mental Wellness Check-in | Mapenzi ya 30" %}
+{% set seo_description = "Take the three-minute Mapenzi ya 30 check-in. We never ask for your name, and what you write stays on your phone." %}
+{% block title %}{{ seo_title }}{% endblock %}
+{% block description %}{{ seo_description }}{% endblock %}
+{% block robots %}index, follow, max-image-preview:large{% endblock %}
+{% block seo %}{% include "_seo.html" %}{% endblock %}
 {% block content %}
 <div class="wrap narrow">
   <header class="page-head">
