@@ -83,6 +83,12 @@ def qr_svg(url):
     )
     return svg.encode("utf-8")
 
+def csv_safe(v):
+    """Stop spreadsheet programs treating a cell as a formula."""
+    s = "" if v is None else str(v)
+    return "'" + s if s[:1] in ("=", "+", "-", "@") else s
+
+
 
 def register(app, d):
     db = d.db
