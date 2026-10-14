@@ -30,7 +30,8 @@ def client(app):
 def admin(client):
     r = client.post("/admin/login", data={"password": PASSWORD})
     assert r.status_code == 302
-    with client.session_transaction() as s:
+    # The session cookie is limited to /admin, so read the session from under that path.
+    with client.session_transaction("/admin/") as s:
         token = s["csrf"]
     client.csrf = token
     return client
