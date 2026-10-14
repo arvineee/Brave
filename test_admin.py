@@ -30,8 +30,7 @@ def client(app):
 def admin(client):
     r = client.post("/admin/login", data={"password": PASSWORD})
     assert r.status_code == 302
-    # The login cookie is scoped to Path=/admin, so the test client only sends it for /admin URLs.
-    with client.session_transaction(path="/admin/") as s:
+    with client.session_transaction() as s:
         token = s["csrf"]
     client.csrf = token
     return client
@@ -325,3 +324,74 @@ def test_admin_is_locked_with_the_rest_of_the_site_when_the_trial_ends(app, admi
     r = admin.get("/admin/")
     assert r.status_code == 302 and "/locked" in r.headers["Location"]
 
+
+# ------------------------------------------------------------ QR code ----
+def save_url(c, url):
+    return c.post("/admin/qr", data={"csrf": c.csrf, "url": url})
+
+
+def test_qr_is_drawn_from_the_saved_address_and_follows_changes(admin):
+    r = admin.get("/admin/qr.svg")
+    assert r.status_code == 200 and r.mimetype == "image/svg+xml" and b"<svg" in r.get_data()
+    assert "/checkin" in admin.get("/admin/qr").get_data(as_text=True)  # default before any save
+
+    assert save_url(admin, "https://old.example.org/checkin").status_code == 302
+    old = admin.get("/admin/qr.svg").get_data()
+    assert save_url(admin, "https://new.example.org/checkin").status_code == 302
+    new = admin.get("/admin/qr.svg").get_data()
+    assert old != new  # the picture really is generated from the stored address
+    assert "https://new.example.org/checkin" in admin.get("/admin/qr").get_data(as_text=True)
+
+    dl = admin.get("/admin/qr/download.svg")
+    assert "attachment" in dl.headers["Content-Disposition"] and dl.get_data() == new
+
+
+def test_bad_qr_address_is_refused_and_the_old_one_stays(admin):
+    save_url(admin, "https://good.example.org/checkin")
+    good = admin.get("/admin/qr.svg").get_data()
+    for bad in ("", "good.example.org", "https://bad address.org", "ftp://x.org/c",
+                "https://user@evil.org/c"):
+        save_url(admin, bad)
+    assert admin.get("/admin/qr.svg").get_data() == good
+
+
+def test_qr_and_report_pages_need_login(client):
+    for path in ("/admin/qr", "/admin/qr.svg", "/admin/report", "/admin/report.csv"):
+        r = client.get(path)
+        assert r.status_code == 302 and "/admin/login" in r.headers["Location"]
+
+
+def test_staff_sign_in_button_only_when_dashboard_is_on(app, client, tmp_path):
+    assert "Staff sign in" in client.get("/").get_data(as_text=True)
+    off = create_app({"TESTING": True, "LICENSE_SECRET": "s",
+                      "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'off.db'}"})
+    assert "Staff sign in" not in off.test_client().get("/").get_data(as_text=True)
+
+
+# ------------------------------------------------------------- report ----
+def _checkin(day, score, hour=9):
+    return Checkin(day=day, hour=hour, score=score, energy="Low", sleep="5-6.", connection=4,
+                   kept_up="School deadlines", support_now="No")
+
+
+def test_report_counts_the_period_and_never_shows_contacts(app, admin):
+    with app.app_context():
+        db.session.add_all([_checkin("2026-10-02", 1), _checkin("2026-10-03", 5, hour=23),
+                            _checkin("2025-01-01", 3),  # outside the period
+                            SupportRequest(day="2026-10-02", support_type="Personal therapy.",
+                                           channel="SMS", contact="0711 222 333")])
+        db.session.commit()
+    csv = admin.get("/admin/report.csv?from=2026-10-01&to=2026-10-31").get_data(as_text=True)
+    assert "Check-ins (submissions),2" in csv
+    assert "Support requests,1" in csv and "Waiting to be contacted,1" in csv
+    assert "0711 222 333" not in csv
+    html = admin.get("/admin/report?from=2026-10-01&to=2026-10-31").get_data(as_text=True)
+    assert "0711 222 333" not in html and "Mapenzi ya 30 check-in report" in html
+    assert "Personal therapy." in html
+
+
+def test_report_bad_or_reversed_dates_fall_back_safely(admin):
+    assert admin.get("/admin/report?from=nope&to=also-nope").status_code == 200
+    csv = admin.get("/admin/report.csv?from=2026-10-31&to=2026-10-01").get_data(as_text=True)
+    assert "From,2026-10-01" in csv and "To,2026-10-31" in csv
+    assert admin.get("/admin/report").status_code == 200  # no dates at all: this month

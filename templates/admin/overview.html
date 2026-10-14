@@ -12,7 +12,7 @@
 
 {% if h.all == 0 %}
 <section class="adm-card"><h2 class="adm-h2">No check-ins yet</h2>
-<p>Statistics appear here as soon as students start submitting. Share the check-in link or QR code to get started.</p></section>
+<p>Statistics appear here as soon as students start submitting. Share the check-in link or <a href="{{ url_for('admin_qr') }}">QR code</a> to get started.</p></section>
 {% else %}
 
 <section class="adm-grid" aria-label="Headline numbers">

@@ -53,6 +53,15 @@ What staff can do
   *unscored* questions (pick one, pick any, or a 0-10 scale).
 * **Contacts & socials**: crisis helpline (shown on every page), Brave email and phone, social
   links in the footer.
+* **Report**: pick a period (From / To) and get a printable summary: check-ins by level, average
+  level, crisis count, time of day and day of week, and support-request counts. Print or save as
+  PDF with the button, or download a CSV. Names and contact details are never in a report.
+* **QR code**: type the check-in address once (e.g. `https://mapenzi.example.org/checkin`). The
+  QR code is drawn from that saved address every time the page loads, so when the site moves,
+  change the address and the code follows. Download it as SVG (sharp at any size, for posters)
+  or print the page. Until an address is saved, the code uses the address the site is reached at.
+* **Staff sign in**: when the dashboard is switched on, a "Staff sign in" button appears in the
+  footer of the public pages, and `/admin` can always be typed in by hand.
 
 Security: login cookie limited to `/admin` (HttpOnly, SameSite=Strict, Secure on https), 8-hour
 sessions, CSRF token on every change, 10 wrong passwords in 10 minutes locks login for a while,
@@ -79,6 +88,9 @@ reflection boxes force 5.
 Logo: `static/brave-logo.svg`, `static/brave-mark.svg` and `templates/_logo.html`
 (a placeholder mark: replace with Brave's official artwork when available).
 All text is in `content.py`.
+
+Dependencies: `segno` draws the QR codes on the server (pure Python, no Pillow). No outside
+service is contacted.
 
 ## Test
     pip install pytest && pytest

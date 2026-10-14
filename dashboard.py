@@ -22,13 +22,15 @@ import secrets
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from functools import wraps
 from typing import Any, Callable
 
 from flask import Response, abort, flash, redirect, render_template, request, session, url_for
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash
+
+import segno
 
 import charts
 import content
@@ -52,16 +54,15 @@ class Deps:
     eat: Any
 
 
-def part_of_day(hour):
-    if hour is None:
-        return "Not recorded"
-    if hour >= 23 or hour < 5:
-        return "Late night"
-    if hour < 12:
-        return "Morning"
-    if hour < 17:
-        return "Afternoon"
-    return "Evening"
+part_of_day = stats.part_of_day  # one definition, shared with the reports
+
+
+def qr_svg(url):
+    """The QR code for `url` as SVG bytes. Drawn on the server, so no outside service is used."""
+    qr = segno.make(url, error="m")
+    buf = io.BytesIO()
+    qr.save(buf, kind="svg", scale=8, border=4, dark="#000000", light="#ffffff")
+    return buf.getvalue()
 
 
 def csv_safe(v):
@@ -451,3 +452,135 @@ def register(app, d):
         else:
             abort(400)
         return redirect(url_for("admin_contacts"))
+
+    # ---------------------------------------------------- staff sign-in link ----
+    @app.context_processor
+    def staff_login_context():
+        """Shows a 'Staff sign in' button on the public footer, only when the dashboard is on."""
+        return {"staff_login": enabled()}
+
+    # ------------------------------------------------------------- QR code ----
+    def check_in_address():
+        """(url, saved). The address staff saved; until they save one, the address this site
+        is reached at, with /checkin added."""
+        row = db.session.get(d.SiteSetting, siteconfig.PUBLIC_URL_KEY)
+        saved = siteconfig.stored_public_url(row.value) if row is not None else None
+        if saved:
+            return saved, True
+        base = app.config.get("SITE_URL") or request.url_root.rstrip("/")
+        return base + "/checkin", False
+
+    @app.get("/admin/qr")
+    @admin_only
+    def admin_qr():
+        url, saved = check_in_address()
+        return page("qr.html", "qr", url=url, saved=saved)
+
+    @app.post("/admin/qr")
+    @admin_only
+    def admin_qr_save():
+        url, errors = siteconfig.clean_public_url(request.form.get("url"))
+        if errors:
+            flash_all(errors)
+            return redirect(url_for("admin_qr"))
+        save(lambda: put_setting(siteconfig.PUBLIC_URL_KEY, url),
+             "Address saved. The QR code now opens it.")
+        return redirect(url_for("admin_qr"))
+
+    @app.get("/admin/qr.svg")
+    @admin_only
+    def admin_qr_image():
+        url, _saved = check_in_address()
+        return Response(qr_svg(url), mimetype="image/svg+xml")
+
+    @app.get("/admin/qr/download.svg")
+    @admin_only
+    def admin_qr_download():
+        url, _saved = check_in_address()
+        return Response(qr_svg(url), mimetype="image/svg+xml",
+                        headers={"Content-Disposition":
+                                 'attachment; filename="mapenzi-checkin-qr.svg"'})
+
+    # -------------------------------------------------------------- report ----
+    def report_period(args):
+        """(start, end) from ?from=&to=. Missing or bad dates mean this month up to today;
+        dates given the wrong way round are swapped."""
+        today = datetime.now(d.eat).date()
+        try:
+            start = date.fromisoformat(args.get("from", ""))
+        except ValueError:
+            start = today.replace(day=1)
+        try:
+            end = date.fromisoformat(args.get("to", ""))
+        except ValueError:
+            end = today
+        if start > end:
+            start, end = end, start
+        return start, end
+
+    def build_report(start, end):
+        lo, hi = start.isoformat(), end.isoformat()
+        rows = (db.session.query(d.Checkin.day, d.Checkin.hour, d.Checkin.score)
+                .filter(d.Checkin.day >= lo, d.Checkin.day <= hi).all())
+        summary = stats.report(rows)
+        sup = d.SupportRequest.query.filter(d.SupportRequest.day >= lo,
+                                            d.SupportRequest.day <= hi).all()
+        # Counts only: no contact details ever go into a report.
+        summary["support"] = {
+            "total": len(sup),
+            "waiting": sum(1 for r in sup if not r.handled),
+            "by_type": Counter(r.support_type or "Not given" for r in sup).most_common(),
+            "by_channel": Counter(r.channel or "Not given" for r in sup).most_common(),
+        }
+        return summary
+
+    @app.get("/admin/report")
+    @admin_only
+    def admin_report():
+        start, end = report_period(request.args)
+        today = datetime.now(d.eat).date()
+        return page("report.html", "report",
+                    p={"start": start, "end": end, "today": today},
+                    r=build_report(start, end), levels=stats.LEVELS, weekdays=stats.WEEKDAYS,
+                    parts=stats.PARTS,
+                    csv_link=url_for("admin_report_csv", **{"from": start.isoformat(),
+                                                             "to": end.isoformat()}))
+
+    @app.get("/admin/report.csv")
+    @admin_only
+    def admin_report_csv():
+        start, end = report_period(request.args)
+        r = build_report(start, end)
+        buf = io.StringIO()
+        w = csv.writer(buf)
+
+        def line(*cells):
+            w.writerow([csv_safe(c) for c in cells])
+
+        line("Mapenzi ya 30 check-in report")
+        line("From", start.isoformat())
+        line("To", end.isoformat())
+        line("Check-ins (submissions)", r["total"])
+        line("Average level (1-5)", "" if r["mean"] is None else r["mean"])
+        line()
+        line("Level", "Level name", "Check-ins", "Share %")
+        for n, name in stats.LEVELS.items():
+            line(n, name, r["counts"][n - 1], "" if r["pct"][n - 1] is None else r["pct"][n - 1])
+        line()
+        line("Part of day", "Check-ins")
+        for part in stats.PARTS:
+            line(part, r["by_part"][part])
+        line()
+        line("Day of week", "Check-ins")
+        for i, wd in enumerate(stats.WEEKDAYS):
+            line(wd, r["by_weekday"][i])
+        line()
+        line("Support requests", r["support"]["total"])
+        line("Waiting to be contacted", r["support"]["waiting"])
+        for t, n in r["support"]["by_type"]:
+            line("Type: " + t, n)
+        for c, n in r["support"]["by_channel"]:
+            line("Channel: " + c, n)
+        name = f"mapenzi-report-{start.isoformat()}-to-{end.isoformat()}.csv"
+        return Response(buf.getvalue(), mimetype="text/csv",
+                        headers={"Content-Disposition": f'attachment; filename="{name}"'})

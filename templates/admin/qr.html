@@ -1,0 +1,30 @@
+{% extends "admin/base.html" %}
+{% block title %}QR code{% endblock %}
+{% block content %}
+<h1 class="adm-h1">QR code</h1>
+<p class="adm-muted">The code is drawn again from the address below every time this page loads. If the site moves to a new address, change it here and the code follows, so the printed code can be replaced at any time.</p>
+
+<section class="adm-card" aria-labelledby="qa-h">
+  <h2 class="adm-h2" id="qa-h">Address the code opens</h2>
+  {% if not saved %}
+  <p class="adm-note">No address is saved yet. The code currently opens <strong>{{ url }}</strong>, the address this site is reached at. Save the address students should use.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('admin_qr_save') }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="adm-label" for="qr-url">Check-in address (full web address, starting https://)</label>
+    <input class="adm-input" id="qr-url" name="url" type="url" value="{{ url }}" maxlength="200" required placeholder="https://mapenzi.example.org/checkin" autocomplete="off">
+    <button class="btn btn-solid btn-block" type="submit">Save address and update the QR code</button>
+  </form>
+</section>
+
+<section class="adm-card adm-qr" aria-labelledby="qc-h">
+  <h2 class="adm-h2" id="qc-h">Current code</h2>
+  <img class="adm-qr-img" src="{{ url_for('admin_qr_image') }}" width="260" height="260" alt="QR code that opens {{ url }}">
+  <p class="adm-muted">Opens: <a href="{{ url }}">{{ url }}</a></p>
+  <p class="adm-actions adm-noprint">
+    <a class="btn btn-solid" href="{{ url_for('admin_qr_download') }}">Download SVG (for printing)</a>
+    <button class="btn btn-ghost" type="button" data-print>Print</button>
+  </p>
+  <p class="adm-muted adm-noprint">The SVG file stays sharp at any size, so it can go on posters and flyers.</p>
+</section>
+{% endblock %}

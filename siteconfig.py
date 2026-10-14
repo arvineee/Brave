@@ -298,3 +298,33 @@ def clean_custom_answers(raw, questions):
                 return None
             out.append((q["id"], str(v)))
     return out
+
+
+# --------------------------------------------------------- QR code address ----
+PUBLIC_URL_KEY = "public_url"   # site_settings key: the address the QR code opens
+MAX_PUBLIC_URL = 200
+
+
+def clean_public_url(raw):
+    """The check-in address the QR code opens. Returns (url, errors)."""
+    url = (raw or "").strip()
+    if not url:
+        return None, ["Type the check-in address the QR code should open."]
+    if len(url) > MAX_PUBLIC_URL or re.search(r"\s", url):
+        return None, ["The address must be one line, at most 200 characters, with no spaces."]
+    p = urlparse(url)
+    if p.scheme not in ("http", "https") or not p.hostname or "@" in p.netloc:
+        return None, ["The address must start with https:// and be a full web address."]
+    return url, []
+
+
+def stored_public_url(raw):
+    """Stored JSON text -> the saved address, or None if none is saved or it is not valid."""
+    try:
+        v = json.loads(raw) if raw else None
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(v, str):
+        return None
+    url, errors = clean_public_url(v)
+    return None if errors else url

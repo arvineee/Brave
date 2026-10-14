@@ -220,3 +220,44 @@ def insights(headline, breakdown, trend, crisis, patterns):
     if breakdown["small"] or trend["small"]:
         out.append("Numbers are still small, so read the percentages as a rough guide only.")
     return out
+
+
+# ----------------------------------------------------------------- report ----
+def part_of_day(hour):
+    """Kenya-time hour -> the part of day used on the responses page and in reports."""
+    if hour is None:
+        return "Not recorded"
+    if hour >= 23 or hour < 5:
+        return "Late night"
+    if hour < 12:
+        return "Morning"
+    if hour < 17:
+        return "Afternoon"
+    return "Evening"
+
+
+PARTS = ("Morning", "Afternoon", "Evening", "Late night", "Not recorded")
+
+
+def report(raw_rows):
+    """Summary for a report over the rows already filtered to the period.
+
+    raw_rows: (day_str, hour, score) tuples. Only totals are returned: no days, no names."""
+    rows = parse_rows(raw_rows)
+    counts = counts_in(rows, None, None)
+    n = sum(counts)
+    by_part = {p: 0 for p in PARTS}
+    by_weekday = [0] * 7
+    for d, h, _s in rows:
+        by_part[part_of_day(h)] += 1
+        by_weekday[d.weekday()] += 1
+    return {
+        "total": n,
+        "counts": counts,
+        "pct": [share(c, n) for c in counts],
+        "mean": round(sum(s * c for s, c in zip(range(1, 6), counts)) / n, 2) if n else None,
+        "crisis": counts[4],
+        "by_part": by_part,
+        "by_weekday": by_weekday,
+        "small": 0 < n < SMALL_N,
+    }

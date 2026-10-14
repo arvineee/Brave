@@ -27,7 +27,9 @@
         ('overview', 'Overview', 'admin_overview'),
         ('responses', 'Responses', 'admin_responses'),
         ('support', 'Support requests', 'admin_support'),
+        ('report', 'Report', 'admin_report'),
         ('questions', 'Questions', 'admin_questions'),
+        ('qr', 'QR code', 'admin_qr'),
         ('contacts', 'Contacts &amp; socials', 'admin_contacts')] %}
       <a href="{{ url_for(endpoint) }}"{% if active == key %} class="on" aria-current="page"{% endif %}>{{ label|safe }}</a>
       {% endfor %}
@@ -42,5 +44,6 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+  <script src="{{ url_for('static', filename='admin.js') }}" defer></script>
 </body>
 </html>

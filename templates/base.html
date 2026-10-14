@@ -40,6 +40,9 @@
       {% if contacts.email or contacts.phone %}
       <p class="footer-text footer-contact">{% if contacts.phone %}<a href="tel:{{ contacts.phone_tel }}">{{ contacts.phone }}</a>{% endif %}{% if contacts.email and contacts.phone %} &bull; {% endif %}{% if contacts.email %}<a href="mailto:{{ contacts.email }}">{{ contacts.email }}</a>{% endif %}</p>
       {% endif %}
+      {% if staff_login %}
+      <p class="footer-staff"><a class="btn btn-ghost" href="{{ url_for('admin_login') }}">Staff sign in</a></p>
+      {% endif %}
       {% if socials %}
       <ul class="footer-socials" aria-label="Brave on social media">
         {% for s in socials %}<li><a class="social-link" href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ s.label }}<span class="sr-only"> on {{ s.platform }} (opens in a new tab)</span></a></li>{% endfor %}

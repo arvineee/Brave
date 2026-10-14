@@ -1,0 +1,84 @@
+{% extends "admin/base.html" %}
+{% block title %}Report{% endblock %}
+{% block content %}
+<div class="adm-noprint">
+  <h1 class="adm-h1">Report</h1>
+  <p class="adm-muted">Choose a period to get a summary you can print, save as PDF or download as CSV. Counts are check-in <em>submissions</em>, not students. Nothing in the report names a student or shows contact details.</p>
+  <form method="get" action="{{ url_for('admin_report') }}" class="adm-report-form">
+    <label class="adm-label" for="rf">From</label>
+    <input class="adm-input" id="rf" type="date" name="from" value="{{ p.start.isoformat() }}" required>
+    <label class="adm-label" for="rt">To</label>
+    <input class="adm-input" id="rt" type="date" name="to" value="{{ p.end.isoformat() }}" required>
+    <button class="btn btn-solid" type="submit">Generate report</button>
+  </form>
+  <p class="adm-actions">
+    <a class="btn btn-ghost" href="{{ csv_link }}">Download CSV</a>
+    <button class="btn btn-ghost" type="button" data-print>Print or save as PDF</button>
+  </p>
+</div>
+
+<article class="adm-report" aria-label="Report">
+  <h2 class="adm-h2">Mapenzi ya 30 check-in report</h2>
+  <p class="adm-muted">Period: {{ p.start.strftime('%d %b %Y') }} to {{ p.end.strftime('%d %b %Y') }}. Prepared {{ p.today.strftime('%d %b %Y') }}. Kenya time.</p>
+
+  {% if r.total == 0 %}
+  <section class="adm-card"><p>There are no check-ins in this period.</p></section>
+  {% else %}
+  <section class="adm-grid" aria-label="Headline numbers">
+    <div class="adm-stat"><p class="adm-stat-label">Check-ins</p><p class="adm-stat-num">{{ r.total }}</p><p class="adm-stat-sub adm-muted">submissions</p></div>
+    <div class="adm-stat"><p class="adm-stat-label">Average level</p><p class="adm-stat-num">{{ r.mean }}</p><p class="adm-stat-sub adm-muted">on a scale of 1 to 5</p></div>
+    <div class="adm-stat is-crisis"><p class="adm-stat-label">In crisis (level 5)</p><p class="adm-stat-num">{{ r.crisis }}</p><p class="adm-stat-sub adm-muted">{{ r.pct[4] }}% of check-ins</p></div>
+    <div class="adm-stat"><p class="adm-stat-label">Support requests</p><p class="adm-stat-num">{{ r.support.total }}</p><p class="adm-stat-sub adm-muted">{{ r.support.waiting }} waiting to be contacted</p></div>
+  </section>
+
+  {% if r.small %}
+  <p class="adm-note">Fewer than 10 check-ins in this period, so read the percentages as a rough guide only.</p>
+  {% endif %}
+
+  <h3>Check-ins by level</h3>
+  <div class="adm-table-wrap">
+  <table class="adm-table">
+    <thead><tr><th scope="col">Level</th><th scope="col">Name</th><th scope="col">Check-ins</th><th scope="col">Share</th></tr></thead>
+    <tbody>
+    {% for n, name in levels.items() %}
+      <tr><td>{{ n }}</td><td>{{ name }}</td><td>{{ r.counts[n - 1] }}</td><td>{{ r.pct[n - 1] if r.pct[n - 1] is not none else '' }}{% if r.pct[n - 1] is not none %}%{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <h3>When check-ins happen</h3>
+  <div class="adm-table-wrap">
+  <table class="adm-table">
+    <thead><tr><th scope="col">Part of day</th><th scope="col">Check-ins</th></tr></thead>
+    <tbody>{% for part in parts %}<tr><td>{{ part }}</td><td>{{ r.by_part[part] }}</td></tr>{% endfor %}</tbody>
+  </table>
+  </div>
+  <div class="adm-table-wrap">
+  <table class="adm-table">
+    <thead><tr>{% for wd in weekdays %}<th scope="col">{{ wd }}</th>{% endfor %}</tr></thead>
+    <tbody><tr>{% for n in r.by_weekday %}<td>{{ n }}</td>{% endfor %}</tr></tbody>
+  </table>
+  </div>
+
+  <h3>Support requests</h3>
+  <p>{{ r.support.total }} received in this period, {{ r.support.waiting }} still waiting to be contacted. Contact details are not included here; see Support requests in the dashboard.</p>
+  {% if r.support.by_type %}
+  <div class="adm-table-wrap">
+  <table class="adm-table">
+    <thead><tr><th scope="col">Type of support</th><th scope="col">Requests</th></tr></thead>
+    <tbody>{% for t, n in r.support.by_type %}<tr><td>{{ t }}</td><td>{{ n }}</td></tr>{% endfor %}</tbody>
+  </table>
+  </div>
+  {% endif %}
+  {% if r.support.by_channel %}
+  <div class="adm-table-wrap">
+  <table class="adm-table">
+    <thead><tr><th scope="col">Preferred channel</th><th scope="col">Requests</th></tr></thead>
+    <tbody>{% for c, n in r.support.by_channel %}<tr><td>{{ c }}</td><td>{{ n }}</td></tr>{% endfor %}</tbody>
+  </table>
+  </div>
+  {% endif %}
+  {% endif %}
+</article>
+{% endblock %}

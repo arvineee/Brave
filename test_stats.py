@@ -165,3 +165,21 @@ def test_label_form_validation_blocks_duplicates_and_overlong():
     assert siteconfig.clean_labels(f)[1]
     f["label_channel"] = ["SMS", "WhatsApp.", "Instagram.", "x" * 21]
     assert siteconfig.clean_labels(f)[1]
+
+
+def test_report_totals_parts_and_crisis_count():
+    r = stats.report([("2026-10-01", 9, 1), ("2026-10-02", 23, 5), ("2026-10-03", None, 3)])
+    assert r["total"] == 3 and r["crisis"] == 1 and r["mean"] == 3.0
+    assert r["by_part"]["Late night"] == 1 and r["by_part"]["Not recorded"] == 1
+    assert r["small"] is True
+    assert stats.report([])["mean"] is None
+
+
+def test_public_url_is_validated_and_read_back():
+    assert siteconfig.clean_public_url(" https://mapenzi.example.org/checkin ")[0] \
+        == "https://mapenzi.example.org/checkin"
+    for bad in ("", "example.org", "https://a b.org", "ftp://x.org", "https://u@evil.org"):
+        assert siteconfig.clean_public_url(bad)[1]
+    assert siteconfig.stored_public_url('"https://x.org/c"') == "https://x.org/c"
+    assert siteconfig.stored_public_url("not json") is None
+    assert siteconfig.stored_public_url(None) is None
