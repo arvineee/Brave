@@ -1,0 +1,124 @@
+{% extends "admin/base.html" %}
+{% block title %}Questions{% endblock %}
+{% block content %}
+{% set groups = {'q1': 'energy', 'q3': 'sleep', 'q4': 'kept_up', 'q7': 'support_now', 'q8': 'support_type', 'q9': 'channel'} %}
+<h1 class="adm-h1">Questions</h1>
+<p class="adm-note">Changes go live on the check-in straight away. Students who already have the form open can still submit it.</p>
+
+<section class="adm-card" aria-labelledby="bi-h">
+  <h2 class="adm-h2" id="bi-h">The ten check-in questions</h2>
+  <p class="adm-muted">You can reword every question and most answer options. The score each answer carries is fixed, because Brave's clinical team signs off the scoring: reword, don't change meaning.
+    Answer options for question 7 are locked because the support questions depend on them.</p>
+  <form method="post" action="{{ url_for('admin_questions_builtin') }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% for k, text in cfg.prompts.items() %}{% set n = loop.index %}
+    <fieldset class="adm-q">
+      <legend>Question {{ n }}</legend>
+      <label class="adm-label" for="prompt_{{ k }}">Wording</label>
+      <input class="adm-input" id="prompt_{{ k }}" name="prompt_{{ k }}" value="{{ text }}" maxlength="200" minlength="3" required>
+      {% if k == 'q2' %}<p class="adm-muted">Answered on a 0 to 10 scale. Keep the wording consistent with &ldquo;0: Not at all&rdquo; and &ldquo;10: I have a lot of friends&rdquo;.</p>{% endif %}
+      {% if k in ('q5', 'q6') %}<p class="adm-muted">Free-text box. What students write stays on their phone.</p>{% endif %}
+      {% if k == 'q10' %}<p class="adm-muted">Optional contact box, with a consent tick box.</p>{% endif %}
+      {% if k in groups %}{% set g = groups[k] %}
+        <p class="adm-label">Answer options{% if g not in caps %} <span class="adm-tag">locked</span>{% endif %}</p>
+        <ul class="adm-opts">
+        {% for label, pts in cfg.form[g] %}
+          <li>
+            {% if g in caps %}<input class="adm-input" name="label_{{ g }}" value="{{ label }}" maxlength="{{ caps[g] }}" required aria-label="Answer option {{ loop.index }} for question {{ n }}">
+            {% else %}<span class="adm-locked">{{ label }}</span>{% endif %}
+            <span class="adm-muted adm-pts">scores {{ pts }}</span>
+          </li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    </fieldset>
+    {% endfor %}
+    <button class="btn btn-solid btn-block" type="submit">Save question wording</button>
+  </form>
+  <details class="adm-confirm">
+    <summary class="adm-danger-link">Restore the original wording</summary>
+    <form method="post" action="{{ url_for('admin_questions_reset') }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn adm-small adm-btn-danger" type="submit">Yes, restore the original</button>
+    </form>
+  </details>
+</section>
+
+<section class="adm-card" aria-labelledby="cu-h">
+  <h2 class="adm-h2" id="cu-h">Extra questions</h2>
+  <p class="adm-muted">These appear after question 10, numbered from 11. They are <strong>not scored</strong>: they never change a student's level, and are reported on the Overview and in the CSV. There is no free-text type on purpose, so nothing a student writes is stored.
+    {{ active_count }} of {{ max_custom }} shown.</p>
+
+  {% for item in custom %}{% set q = item.q %}
+  <details class="adm-edit">
+    <summary>
+      <span>{{ q.prompt }}</span>
+      <span class="adm-tag">{{ kinds[q.kind] }}</span>
+      {% if not q.active %}<span class="adm-tag is-off">hidden</span>{% endif %}
+      {% if q.required %}<span class="adm-tag">required</span>{% endif %}
+    </summary>
+    <form method="post" action="{{ url_for('admin_custom_edit', qid=q.id) }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="adm-label" for="p{{ q.id }}">Wording</label>
+      <input class="adm-input" id="p{{ q.id }}" name="prompt" value="{{ q.prompt }}" maxlength="200" required>
+      <label class="adm-label" for="k{{ q.id }}">Type</label>
+      <select class="adm-input" id="k{{ q.id }}" name="kind">
+        {% for key, label in kinds.items() %}<option value="{{ key }}"{% if key == q.kind %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <label class="adm-label" for="o{{ q.id }}">Answer options <span class="adm-muted">(one per line, for the two &ldquo;pick&rdquo; types)</span></label>
+      <textarea class="adm-input" id="o{{ q.id }}" name="options" rows="4">{% if q.kind != 'scale' %}{{ item.options|join('\n') }}{% endif %}</textarea>
+      <div class="adm-two">
+        <div><label class="adm-label" for="lo{{ q.id }}">Scale: low end label</label>
+          <input class="adm-input" id="lo{{ q.id }}" name="scale_low" maxlength="40" value="{{ item.options[0] if q.kind == 'scale' else '' }}"></div>
+        <div><label class="adm-label" for="hi{{ q.id }}">Scale: high end label</label>
+          <input class="adm-input" id="hi{{ q.id }}" name="scale_high" maxlength="40" value="{{ item.options[1] if q.kind == 'scale' else '' }}"></div>
+      </div>
+      <div class="adm-two">
+        <div><label class="adm-label" for="pos{{ q.id }}">Order (smaller shows first)</label>
+          <input class="adm-input" id="pos{{ q.id }}" name="position" type="number" min="0" max="999" value="{{ q.position }}"></div>
+        <label class="adm-check"><input type="checkbox" name="required" value="1"{% if q.required %} checked{% endif %}><span>Students must answer</span></label>
+      </div>
+      {% if item.answers %}<p class="adm-muted">{{ item.answers }} answer{{ '' if item.answers == 1 else 's' }} recorded. Changing the wording of an option does not change answers already given.</p>{% endif %}
+      <button class="btn btn-solid adm-small" type="submit">Save changes</button>
+    </form>
+    <div class="adm-actions">
+      <form method="post" action="{{ url_for('admin_custom_toggle', qid=q.id) }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-outline adm-small" type="submit">{{ 'Show on form' if not q.active else 'Hide from form' }}</button>
+      </form>
+      <details class="adm-confirm">
+        <summary class="adm-danger-link">Delete</summary>
+        <p class="adm-muted">Deletes the question and all {{ item.answers }} answer{{ '' if item.answers == 1 else 's' }}. Hide it instead to keep the results.</p>
+        <form method="post" action="{{ url_for('admin_custom_delete', qid=q.id) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="btn adm-small adm-btn-danger" type="submit">Yes, delete it</button>
+        </form>
+      </details>
+    </div>
+  </details>
+  {% else %}
+  <p class="adm-muted">No extra questions yet.</p>
+  {% endfor %}
+
+  <details class="adm-edit" {% if not custom %}open{% endif %}>
+    <summary><strong>+ Add a question</strong></summary>
+    <form method="post" action="{{ url_for('admin_custom_add') }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="adm-label" for="new-prompt">Wording</label>
+      <input class="adm-input" id="new-prompt" name="prompt" maxlength="200" required placeholder="e.g. Do you feel safe at school?">
+      <label class="adm-label" for="new-kind">Type</label>
+      <select class="adm-input" id="new-kind" name="kind">
+        {% for key, label in kinds.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+      </select>
+      <label class="adm-label" for="new-options">Answer options <span class="adm-muted">(one per line, 2 to {{ max_options }}; for the two &ldquo;pick&rdquo; types)</span></label>
+      <textarea class="adm-input" id="new-options" name="options" rows="4" placeholder="Yes&#10;Sometimes&#10;No"></textarea>
+      <div class="adm-two">
+        <div><label class="adm-label" for="new-lo">Scale: low end label</label><input class="adm-input" id="new-lo" name="scale_low" maxlength="40"></div>
+        <div><label class="adm-label" for="new-hi">Scale: high end label</label><input class="adm-input" id="new-hi" name="scale_high" maxlength="40"></div>
+      </div>
+      <label class="adm-check"><input type="checkbox" name="required" value="1"><span>Students must answer</span></label>
+      <button class="btn btn-solid btn-block" type="submit">Add question</button>
+    </form>
+  </details>
+</section>
+{% endblock %}

@@ -24,7 +24,7 @@
       <legend class="panel-title"><span class="panel-num">1</span>Daily Check-in</legend>
 
       <div class="field">
-        <label for="q1">1. How&rsquo;s your energy today &ndash; honestly? <span class="req" aria-hidden="true">*</span></label>
+        <label for="q1">1. {{ p.q1 }} <span class="req" aria-hidden="true">*</span></label>
         <select id="q1" required>
           <option value="" disabled selected>Select an option</option>
           {% for o in f.energy %}<option value="{{ o[1] }}">{{ o[0] }}</option>{% endfor %}
@@ -32,7 +32,7 @@
       </div>
 
       <div class="field">
-        <div class="field-label" id="q2-label">2. How connected do you feel to people at school right now? <span class="req" aria-hidden="true">*</span></div>
+        <div class="field-label" id="q2-label">2. {{ p.q2 }} <span class="req" aria-hidden="true">*</span></div>
         <div class="scale" role="radiogroup" aria-labelledby="q2-label">
           {% for n in range(11) %}
           <label class="pill"><input type="radio" name="connection" value="{{ n }}" {% if n == 0 %}required{% endif %}><span>{{ n }}</span></label>
@@ -46,7 +46,7 @@
       <legend class="panel-title"><span class="panel-num">2</span>Sleep &amp; Rest</legend>
 
       <div class="field">
-        <label for="q3">3. How many hours of sleep did you get last night? <span class="req" aria-hidden="true">*</span></label>
+        <label for="q3">3. {{ p.q3 }} <span class="req" aria-hidden="true">*</span></label>
         <select id="q3" required>
           <option value="" disabled selected>Select hours</option>
           {% for o in f.sleep %}<option value="{{ o[1] }}">{{ o[0] }}</option>{% endfor %}
@@ -54,7 +54,7 @@
       </div>
 
       <div class="field">
-        <div class="field-label" id="q4-label">4. What mainly kept you up? <span class="req" aria-hidden="true">*</span></div>
+        <div class="field-label" id="q4-label">4. {{ p.q4 }} <span class="req" aria-hidden="true">*</span></div>
         <div class="checks" role="group" aria-labelledby="q4-label">
           {% for o in f.kept_up %}
           <label class="check"><input type="checkbox" data-points="{{ o[1] }}" data-label="{{ o[0] }}" required><span>{{ o[0] }}</span></label>
@@ -68,12 +68,12 @@
       <p class="note">What you write here is private. It stays on your phone and is never saved or sent.</p>
 
       <div class="field">
-        <label for="q5">5. One small win from this week &ndash; anything counts <span class="req" aria-hidden="true">*</span></label>
+        <label for="q5">5. {{ p.q5 }} <span class="req" aria-hidden="true">*</span></label>
         <textarea id="q5" rows="3" placeholder="Type your reflection here..." required></textarea>
       </div>
 
       <div class="field">
-        <label for="q6">6. What made this week feel heavy? <span class="req" aria-hidden="true">*</span></label>
+        <label for="q6">6. {{ p.q6 }} <span class="req" aria-hidden="true">*</span></label>
         <textarea id="q6" rows="3" placeholder="Type your reflection here..." required></textarea>
       </div>
     </fieldset>
@@ -82,7 +82,7 @@
       <legend class="panel-title"><span class="panel-num">4</span>Support</legend>
 
       <div class="field">
-        <label for="q7">7. Would you like any mental wellness support right now? <span class="req" aria-hidden="true">*</span></label>
+        <label for="q7">7. {{ p.q7 }} <span class="req" aria-hidden="true">*</span></label>
         <select id="q7" required>
           <option value="" disabled selected>Select an option</option>
           {% for o in f.support_now %}<option value="{{ o[1] }}">{{ o[0] }}</option>{% endfor %}
@@ -91,7 +91,7 @@
 
       <div id="support-extra">
         <div class="field">
-          <label for="q8">8. What kind of support would help most right now? <span class="opt">(if you&rsquo;d like support)</span></label>
+          <label for="q8">8. {{ p.q8 }} <span class="opt">(if you&rsquo;d like support)</span></label>
           <select id="q8">
             <option value="" disabled selected>Select support type</option>
             {% for o in f.support_type %}<option value="{{ o[1] }}">{{ o[0] }}</option>{% endfor %}
@@ -99,7 +99,7 @@
         </div>
 
         <div class="field">
-          <label for="q9">9. How should support reach you? <span class="opt">(if you&rsquo;d like support)</span></label>
+          <label for="q9">9. {{ p.q9 }} <span class="opt">(if you&rsquo;d like support)</span></label>
           <select id="q9">
             <option value="" disabled selected>Select channel</option>
             {% for o in f.channel %}<option value="{{ o[1] }}">{{ o[0] }}</option>{% endfor %}
@@ -107,7 +107,7 @@
         </div>
 
         <div class="field">
-          <label for="q10">10. Best contact to reach you on <span class="opt">(optional, so Brave can reach you)</span></label>
+          <label for="q10">10. {{ p.q10 }} <span class="opt">(optional, so Brave can reach you)</span></label>
           <input id="q10" type="text" maxlength="120" autocomplete="off" placeholder="Phone number, handle or email">
           <label class="check consent">
             <input id="consent" type="checkbox"><span>I agree that Brave may contact me using the details above. They are
@@ -117,6 +117,36 @@
         </div>
       </div>
     </fieldset>
+
+    {% if custom %}
+    <fieldset class="panel" id="extra-questions">
+      <legend class="panel-title"><span class="panel-num">5</span>A few more questions</legend>
+      {% for q in custom %}
+      <div class="field">
+        {% if q.kind == "choice" %}
+        <label for="cq-{{ q.id }}">{{ 10 + loop.index }}. {{ q.prompt }}{% if q.required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+        <select id="cq-{{ q.id }}" data-cq="{{ q.id }}" data-kind="choice"{% if q.required %} required{% endif %}>
+          <option value="" disabled selected>Select an option</option>
+          {% for o in q.options %}<option value="{{ o }}">{{ o }}</option>{% endfor %}
+        </select>
+        {% elif q.kind == "multi" %}
+        <div class="field-label" id="cq-{{ q.id }}-label">{{ 10 + loop.index }}. {{ q.prompt }}{% if q.required %} <span class="req" aria-hidden="true">*</span>{% endif %}</div>
+        <div class="checks" role="group" aria-labelledby="cq-{{ q.id }}-label" data-cq-group="{{ q.id }}"{% if q.required %} data-required="1"{% endif %}>
+          {% for o in q.options %}
+          <label class="check"><input type="checkbox" data-cq-box="{{ q.id }}" data-cq-label="{{ o }}"><span>{{ o }}</span></label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <label for="cq-{{ q.id }}">{{ 10 + loop.index }}. {{ q.prompt }}{% if q.required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+        <select id="cq-{{ q.id }}" data-cq="{{ q.id }}" data-kind="scale"{% if q.required %} required{% endif %}>
+          <option value="" disabled selected>Select 0 to 10</option>
+          {% for n in range(11) %}<option value="{{ n }}">{{ n }}{% if n == 0 and q.options[0] %}: {{ q.options[0] }}{% elif n == 10 and q.options[1] %}: {{ q.options[1] }}{% endif %}</option>{% endfor %}
+        </select>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </fieldset>
+    {% endif %}
 
     <button id="submit-btn" type="submit" class="btn btn-solid btn-block">Submit Check-in</button>
     <p class="fine-print">Your response is worked out on your phone. We save only your score and

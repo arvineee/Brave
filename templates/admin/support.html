@@ -1,0 +1,46 @@
+{% extends "admin/base.html" %}
+{% block title %}Support requests{% endblock %}
+{% block content %}
+<h1 class="adm-h1">Support requests</h1>
+<p class="adm-note">Students who asked to be contacted and ticked consent. This is the only place personal contact details are stored, and they are kept apart from check-in answers. Delete a request once you have followed up.</p>
+
+<p class="adm-muted"><strong>{{ waiting }}</strong> waiting &middot; {{ rows|length }} total</p>
+
+{% if not rows %}<section class="adm-card"><p>No support requests yet.</p></section>{% endif %}
+
+<ul class="adm-rows">
+{% for r in rows %}
+<li class="adm-row{{ ' is-done' if r.handled }}">
+  <div class="adm-row-head">
+    <span class="adm-contact">{{ r.contact }}</span>
+    <span class="adm-muted">{{ r.day }}</span>
+  </div>
+  <p class="adm-muted">Prefers <strong>{{ r.channel }}</strong> &middot; wants {{ r.support_type }}</p>
+  <div class="adm-actions">
+    <form method="post" action="{{ url_for('admin_support_handled', rid=r.id) }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn btn-outline adm-small" type="submit">{{ 'Mark as waiting' if r.handled else 'Mark as contacted' }}</button>
+    </form>
+    <details class="adm-confirm">
+      <summary class="adm-danger-link">Delete</summary>
+      <form method="post" action="{{ url_for('admin_support_delete', rid=r.id) }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn adm-small adm-btn-danger" type="submit">Yes, delete this request</button>
+      </form>
+    </details>
+  </div>
+</li>
+{% endfor %}
+</ul>
+
+{% if rows|selectattr('handled')|list %}
+<details class="adm-confirm adm-card">
+  <summary class="adm-danger-link">Delete all contacted requests</summary>
+  <p class="adm-muted">Removes every request marked as contacted. This cannot be undone.</p>
+  <form method="post" action="{{ url_for('admin_support_purge') }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn adm-small adm-btn-danger" type="submit">Yes, delete them</button>
+  </form>
+</details>
+{% endif %}
+{% endblock %}

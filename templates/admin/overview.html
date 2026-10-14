@@ -1,0 +1,120 @@
+{% extends "admin/base.html" %}
+{% block title %}Overview{% endblock %}
+{% macro delta(c, noun, judge=true) -%}
+  {%- if c.dir == 'same' -%}<span class="adm-delta same">no change</span>
+  {%- else -%}<span class="adm-delta {{ c.dir }}{% if judge %}{{ ' worse' if c.dir == 'up' else ' better' }}{% endif %}">{{ '▲' if c.dir == 'up' else '▼' }} {{ c.diff|abs }}</span>{%- endif -%}
+  <span class="adm-muted"> vs {{ c.prev }} {{ noun }}</span>
+{%- endmacro %}
+{% block content %}
+{% set h = data.headline %}{% set b = data.breakdown %}{% set t = data.trend %}{% set c = data.crisis %}{% set p = data.patterns %}
+<h1 class="adm-h1">Overview</h1>
+<p class="adm-muted">Counts are check-in <em>submissions</em>, not students: check-ins are anonymous, so one student who checks in twice counts twice. Dates are Kenya time. Weeks run Monday to Sunday.</p>
+
+{% if h.all == 0 %}
+<section class="adm-card"><h2 class="adm-h2">No check-ins yet</h2>
+<p>Statistics appear here as soon as students start submitting. Share the check-in link or QR code to get started.</p></section>
+{% else %}
+
+<section class="adm-grid" aria-label="Headline numbers">
+  <div class="adm-stat"><p class="adm-stat-label">This week</p><p class="adm-stat-num">{{ h.week.cur }}</p><p class="adm-stat-sub">{{ delta(h.week, 'at this point last week', false) }}</p></div>
+  <div class="adm-stat"><p class="adm-stat-label">This month</p><p class="adm-stat-num">{{ h.month.cur }}</p><p class="adm-stat-sub">{{ delta(h.month, 'at this point last month', false) }}</p></div>
+  <div class="adm-stat is-crisis"><p class="adm-stat-label">In crisis (level 5), this week</p><p class="adm-stat-num">{{ c.week.cur }}</p><p class="adm-stat-sub">{{ delta(c.week, 'at this point last week') }}</p></div>
+  <div class="adm-stat"><p class="adm-stat-label">All time</p><p class="adm-stat-num">{{ h.all }}</p><p class="adm-stat-sub adm-muted">{{ h.last_month_full }} last month</p></div>
+</section>
+
+{% if data.insights %}
+<section class="adm-card adm-insights" aria-labelledby="ins-h">
+  <h2 class="adm-h2" id="ins-h">What stands out</h2>
+  <ul>{% for line in data.insights %}<li>{{ line }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<nav class="adm-range" aria-label="Range for the breakdown and time patterns">
+  <span class="adm-muted">Showing:</span>
+  {% for key, label in ranges.items() %}
+  <a href="{{ url_for('admin_overview', range=key) }}"{% if b.range == key %} class="on" aria-current="true"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>
+
+<section class="adm-card" aria-labelledby="bd-h">
+  <h2 class="adm-h2" id="bd-h">Check-ins by level &middot; {{ b.label|lower }}</h2>
+  {% if b.total %}
+  {{ figs.levels }}
+  <p class="adm-muted">{{ b.total }} check-in{{ '' if b.total == 1 else 's' }}.{% if b.small %} Few so far, so treat percentages as a rough guide.{% endif %}</p>
+  {% else %}<p class="adm-muted">No check-ins in this range yet.</p>{% endif %}
+</section>
+
+<section class="adm-card" aria-labelledby="tr-h">
+  <h2 class="adm-h2" id="tr-h">Is it shifting?</h2>
+  <p>Month so far against the same days last month, as a share of check-ins:</p>
+  <div class="adm-table-wrap"><table class="adm-table">
+    <thead><tr><th scope="col">Level</th><th scope="col" class="num">This month</th><th scope="col" class="num">Last month</th></tr></thead>
+    <tbody>
+    {% for i in range(5) %}
+    <tr><th scope="row"><span class="dot b{{ i + 1 }}"></span>{{ levels[i + 1] }}</th>
+      <td class="num">{{ t.this_counts[i] }}{% if t.this_pct[i] is not none %} <span class="adm-muted">({{ t.this_pct[i]|round|int }}%)</span>{% endif %}</td>
+      <td class="num">{{ t.last_counts[i] }}{% if t.last_pct[i] is not none %} <span class="adm-muted">({{ t.last_pct[i]|round|int }}%)</span>{% endif %}</td></tr>
+    {% endfor %}
+    <tr class="total"><th scope="row">Total</th><td class="num">{{ t.this_total }}</td><td class="num">{{ t.last_total }}</td></tr>
+    </tbody>
+  </table></div>
+  {% if t.share45_delta is not none %}
+  <p>Struggling + in crisis: <strong>{{ t.share45_this|round(1) }}%</strong> now vs <strong>{{ t.share45_last|round(1) }}%</strong> then
+    ({{ 'up' if t.share45_delta > 0 else 'down' if t.share45_delta < 0 else 'unchanged' }}{% if t.share45_delta %} {{ t.share45_delta|abs|round(1) }} points{% endif %}).</p>
+  {% endif %}
+  {% if t.small %}<p class="adm-muted">With so few check-ins, one or two students can move these percentages a lot.</p>{% endif %}
+  <h3 class="adm-h3">Last 8 weeks</h3>
+  {{ figs.weekly }}
+  <p class="adm-legend"><span><i class="dot b1"></i>Thriving</span><span><i class="dot b2"></i>Holding steady</span><span><i class="dot b3"></i>Noticing strain</span><span><i class="dot b4"></i>Struggling</span><span><i class="dot b5"></i>In crisis</span></p>
+</section>
+
+<section class="adm-card adm-crisis-card" aria-labelledby="cr-h">
+  <h2 class="adm-h2" id="cr-h">Crisis flags (level 5)</h2>
+  <div class="adm-grid two">
+    <div><p class="adm-stat-label">This week</p><p class="adm-stat-num">{{ c.week.cur }}</p><p class="adm-stat-sub">{{ delta(c.week, 'at this point last week') }}</p></div>
+    <div><p class="adm-stat-label">This month</p><p class="adm-stat-num">{{ c.month.cur }}</p><p class="adm-stat-sub">{{ delta(c.month, 'at this point last month') }}</p></div>
+  </div>
+  {{ figs.crisis }}
+  <p class="adm-muted">A level 5 is also triggered when a student's reflection mentions self-harm words, which is checked on their phone. These counts are submissions, not people, and Brave can only follow up with students who chose to leave a contact (see Support requests). {{ c.all }} in total so far.</p>
+</section>
+
+<section class="adm-card" aria-labelledby="pt-h">
+  <h2 class="adm-h2" id="pt-h">When students check in &middot; {{ b.label|lower }}</h2>
+  <h3 class="adm-h3">Time of day (Kenya time)</h3>
+  {% if p.timed %}
+  {{ figs.hours }}
+  <p class="adm-muted"><i class="dot night"></i>Late night is 11 pm to 5 am.
+    {% if p.night_share is not none %}<strong>{{ p.night_share|round|int }}%</strong> of timed check-ins arrived then.{% endif %}
+    {% if p.peak_hour %} Busiest hour starts at {{ p.peak_hour }}.{% endif %}
+    {% if p.untimed %} {{ p.untimed }} older check-in{{ '' if p.untimed == 1 else 's' }} have no time recorded.{% endif %}</p>
+  {% else %}<p class="adm-muted">No timed check-ins in this range yet. Times are recorded from the update that added this dashboard onward.</p>{% endif %}
+
+  <h3 class="adm-h3">Day of week</h3>
+  {% if b.total %}
+  {{ figs.weekdays }}
+  <div class="adm-table-wrap"><table class="adm-table">
+    <thead><tr><th scope="col">Day</th>{% for w in weekdays %}<th scope="col" class="num">{{ w }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      <tr><th scope="row">Check-ins</th>{% for n in p.by_weekday %}<td class="num">{{ n }}</td>{% endfor %}</tr>
+      <tr><th scope="row">Average level</th>{% for m in p.mean_by_weekday %}<td class="num">{{ m if m is not none else '–' }}</td>{% endfor %}</tr>
+    </tbody>
+  </table></div>
+  <p class="adm-muted">Average level runs from 1 (thriving) to 5 (in crisis).{% if p.peak_weekday %} Busiest day: {{ p.peak_weekday }}.{% endif %}</p>
+  {% endif %}
+</section>
+
+{% endif %}
+
+{% if custom_results %}
+<section class="adm-card" aria-labelledby="cq-h">
+  <h2 class="adm-h2" id="cq-h">Your added questions &middot; all time</h2>
+  {% for r in custom_results %}
+  <h3 class="adm-h3">{{ r.prompt }}{% if not r.active %} <span class="adm-tag">hidden</span>{% endif %}</h3>
+  <ul class="adm-bars">
+    {% for label, n in r.rows %}<li><span>{{ label }}</span><b>{{ n }}</b></li>{% endfor %}
+  </ul>
+  <p class="adm-muted">{{ r.total }} answer{{ '' if r.total == 1 else 's' }}{% if r.mean is not none %}, average {{ r.mean }}{% endif %}.</p>
+  {% endfor %}
+</section>
+{% endif %}
+{% endblock %}

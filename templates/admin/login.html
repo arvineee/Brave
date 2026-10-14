@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Staff sign in | Mapenzi ya 30</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brave-mark.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+</head>
+<body class="admin">
+  <main class="adm-login">
+    <div class="adm-card">
+      <span class="adm-logo">{% include "_logo.html" %}</span>
+      <h1 class="adm-h1">Staff sign in</h1>
+      <p class="adm-muted">Mapenzi ya 30 dashboard. Students never see this page.</p>
+      {% if error %}<p class="adm-flash is-error" role="alert">{{ error }}</p>{% endif %}
+      <form method="post" action="{{ url_for('admin_login') }}">
+        <label class="adm-label" for="password">Password</label>
+        <input class="adm-input" id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+        <button class="btn btn-solid btn-block" type="submit">Sign in</button>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

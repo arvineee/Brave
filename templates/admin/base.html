@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0d9488">
+  <title>{% block title %}Dashboard{% endblock %} | Mapenzi ya 30 admin</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brave-mark.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+</head>
+<body class="admin">
+  <header class="adm-top">
+    <div class="adm-wrap adm-bar">
+      <a class="adm-brand" href="{{ url_for('admin_overview') }}">
+        <span class="adm-logo">{% include "_logo.html" %}</span>
+        <span class="adm-sub">Admin</span>
+      </a>
+      <form method="post" action="{{ url_for('admin_logout') }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="adm-link" type="submit">Log out</button>
+      </form>
+    </div>
+    <nav class="adm-wrap adm-tabs" aria-label="Admin">
+      {% for key, label, endpoint in [
+        ('overview', 'Overview', 'admin_overview'),
+        ('responses', 'Responses', 'admin_responses'),
+        ('support', 'Support requests', 'admin_support'),
+        ('questions', 'Questions', 'admin_questions'),
+        ('contacts', 'Contacts &amp; socials', 'admin_contacts')] %}
+      <a href="{{ url_for(endpoint) }}"{% if active == key %} class="on" aria-current="page"{% endif %}>{{ label|safe }}</a>
+      {% endfor %}
+    </nav>
+  </header>
+
+  <main class="adm-wrap adm-main">
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in msgs %}
+      <p class="adm-flash {{ 'is-error' if cat == 'error' else 'is-ok' }}" role="{{ 'alert' if cat == 'error' else 'status' }}">{{ msg }}</p>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

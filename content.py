@@ -123,3 +123,29 @@ FORM = {
 
 # Answers of question 7 that open the support questions.
 WANTS_SUPPORT = ("Yes", "Maybe.")
+
+# ---- Wording of the ten built-in questions (editable from /admin/questions) ----
+# The number ("1.") is added by the template. Scoring options stay in FORM above.
+PROMPTS = {
+    "q1": "How’s your energy today – honestly?",
+    "q2": "How connected do you feel to people at school right now?",
+    "q3": "How many hours of sleep did you get last night?",
+    "q4": "What mainly kept you up?",
+    "q5": "One small win from this week – anything counts",
+    "q6": "What made this week feel heavy?",
+    "q7": "Would you like any mental wellness support right now?",
+    "q8": "What kind of support would help most right now?",
+    "q9": "How should support reach you?",
+    "q10": "Best contact to reach you on",
+}
+
+# Option groups whose labels staff may reword (position and points never change, so the
+# scoring rubric stays as signed off). support_now is locked: the form logic depends on it.
+# Value = the longest label the database column can hold.
+EDITABLE_LABELS = {"energy": 60, "sleep": 30, "kept_up": 40, "support_type": 80, "channel": 20}
+
+# Public contact details shown in the site footer (empty until staff add them).
+CONTACTS = {"email": "", "phone": ""}
+
+SOCIAL_PLATFORMS = ("Instagram", "Facebook", "X", "TikTok", "YouTube", "WhatsApp",
+                    "LinkedIn", "Website")

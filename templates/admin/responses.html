@@ -1,0 +1,51 @@
+{% extends "admin/base.html" %}
+{% block title %}Responses{% endblock %}
+{% block content %}
+<h1 class="adm-h1">Responses</h1>
+<p class="adm-note">Each row is one anonymous check-in. You see the day, the part of day, the level and the multiple-choice answers.
+  <strong>What students type in the two reflection boxes is never sent to the server</strong>, as the home page promises, so it cannot be shown here.</p>
+
+<nav class="adm-range" aria-label="Filter by level">
+  <span class="adm-muted">Level:</span>
+  <a href="{{ url_for('admin_responses') }}"{% if not score %} class="on" aria-current="true"{% endif %}>All</a>
+  {% for n, name in levels.items() %}
+  <a href="{{ url_for('admin_responses', score=n) }}"{% if score == n %} class="on" aria-current="true"{% endif %}>{{ n }} {{ name }}</a>
+  {% endfor %}
+</nav>
+
+<p class="adm-muted">{{ total }} check-in{{ '' if total == 1 else 's' }}{% if score %} at level {{ score }}{% endif %}.
+  <a href="{{ url_for('admin_responses_csv', score=score) if score else url_for('admin_responses_csv') }}">Download as CSV</a></p>
+
+{% if not items %}
+<section class="adm-card"><p>Nothing to show yet.</p></section>
+{% endif %}
+
+<ul class="adm-rows">
+{% for it in items %}{% set r = it.row %}
+<li class="adm-row">
+  <div class="adm-row-head">
+    <span class="adm-chip b{{ r.score }}">{{ r.score }} &middot; {{ it.level }}</span>
+    <span class="adm-muted">{{ r.day }} &middot; {{ it.part }}</span>
+  </div>
+  <dl class="adm-dl">
+    <div><dt>Energy</dt><dd>{{ r.energy }}</dd></div>
+    <div><dt>Sleep (hours)</dt><dd>{{ r.sleep }}</dd></div>
+    <div><dt>Connected (0 to 10)</dt><dd>{{ r.connection }}</dd></div>
+    <div><dt>Kept up by</dt><dd>{{ r.kept_up }}</dd></div>
+    <div><dt>Wants support</dt><dd>{{ r.support_now }}</dd></div>
+    {% if r.support_type %}<div><dt>Support type</dt><dd>{{ r.support_type }}</dd></div>{% endif %}
+    {% if r.channel %}<div><dt>Channel</dt><dd>{{ r.channel }}</dd></div>{% endif %}
+    {% for title, answer in it.custom %}<div><dt>{{ title }}</dt><dd>{{ answer }}</dd></div>{% endfor %}
+  </dl>
+</li>
+{% endfor %}
+</ul>
+
+{% if pages > 1 %}
+<nav class="adm-pager" aria-label="Pages">
+  {% if page_no > 1 %}<a class="btn btn-outline" href="{{ url_for('admin_responses', page=page_no - 1, score=score) }}">Newer</a>{% endif %}
+  <span class="adm-muted">Page {{ page_no }} of {{ pages }}</span>
+  {% if page_no < pages %}<a class="btn btn-outline" href="{{ url_for('admin_responses', page=page_no + 1, score=score) }}">Older</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

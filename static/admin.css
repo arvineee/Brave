@@ -1,0 +1,132 @@
+/* Mapenzi ya 30 admin. Mobile-first, loaded after style.css (reuses its colour variables).
+   No inline styles anywhere: the site's CSP forbids them, so charts are coloured here. */
+body.admin{background:#f4f8f7;min-height:100vh}
+.adm-wrap{width:100%;max-width:960px;margin:0 auto;padding-left:var(--gutter);padding-right:var(--gutter)}
+.adm-top{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:40}
+.adm-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px}
+.adm-brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+.adm-logo .logo{height:30px}
+.adm-sub{font-size:.75rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--teal-800);
+  background:var(--teal-100);padding:3px 9px;border-radius:999px}
+.adm-link{background:none;border:0;font:600 .95rem var(--font);color:var(--teal-800);padding:10px 4px;cursor:pointer;text-decoration:underline}
+.adm-tabs{display:flex;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:0;scrollbar-width:thin}
+.adm-tabs a{flex:0 0 auto;padding:11px 12px;font-weight:600;font-size:.92rem;text-decoration:none;color:var(--muted);
+  border-bottom:3px solid transparent;white-space:nowrap}
+.adm-tabs a:hover{color:var(--teal-800)}
+.adm-tabs a.on{color:var(--teal-800);border-bottom-color:var(--teal-700)}
+.adm-main{padding-top:22px;padding-bottom:56px}
+
+.adm-h1{font-size:clamp(1.5rem,6vw,2rem);margin-bottom:6px}
+.adm-h2{font-size:1.2rem;margin-bottom:10px}
+.adm-h3{font-size:1rem;margin:20px 0 6px;color:var(--teal-900)}
+.adm-muted{color:var(--muted);font-size:.9rem}
+p.adm-muted,.adm-note{margin:6px 0 14px}
+.adm-note{background:#fff;border:1px solid var(--line);border-left:4px solid var(--teal-700);border-radius:10px;
+  padding:12px 14px;font-size:.92rem}
+.adm-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px 16px;margin:16px 0;box-shadow:var(--shadow)}
+.adm-card p{margin:0 0 10px}
+.adm-flash{margin:0 0 14px;padding:12px 14px;border-radius:10px;font-weight:600;font-size:.95rem}
+.adm-flash.is-ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+.adm-flash.is-error{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.adm-tag{display:inline-block;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--teal-50);
+  color:var(--teal-800);border:1px solid var(--line);vertical-align:middle}
+.adm-tag.is-off{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
+
+/* headline stats */
+.adm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+.adm-grid.two{grid-template-columns:1fr 1fr;margin:8px 0}
+.adm-stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
+.adm-stat.is-crisis{border-top:4px solid var(--c5)}
+.adm-stat-label{font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:0}
+.adm-stat-num{font-size:2.1rem;font-weight:800;line-height:1.1;color:var(--teal-900);margin:4px 0 2px}
+.adm-stat-sub{font-size:.82rem;margin:0}
+.adm-delta{font-weight:800}
+.adm-delta.worse{color:#b91c1c}.adm-delta.better{color:#15803d}.adm-delta.same{color:var(--muted)}
+.adm-insights ul{list-style:disc;padding-left:20px}.adm-insights li{margin:6px 0}
+.adm-crisis-card{border-top:5px solid var(--c5)}
+
+/* range switch */
+.adm-range{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:18px 0 0}
+.adm-range a{padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--teal-800);
+  font-weight:600;font-size:.88rem;text-decoration:none}
+.adm-range a.on{background:var(--teal-700);border-color:var(--teal-700);color:#fff}
+
+/* charts */
+.chart{width:100%;height:auto;max-width:520px;margin:6px 0}
+.chart .axis{font:10px var(--font);fill:var(--muted)}
+.chart .val{font:700 10px var(--font);fill:var(--ink)}
+.chart .mid{text-anchor:middle}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .bar{fill:var(--teal)}
+.chart .bar.mark{fill:#3b4a8f}
+.chart .bar.crisis{fill:var(--c5)}
+.b1{fill:var(--c1);background:var(--c1)}.b2{fill:var(--c2);background:var(--c2)}.b3{fill:var(--c3);background:var(--c3)}
+.b4{fill:var(--c4);background:var(--c4)}.b5{fill:var(--c5);background:var(--c5)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:baseline}
+.dot.night{background:#3b4a8f}
+.adm-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.8rem;color:var(--muted);margin:4px 0 0}
+.adm-legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+
+/* tables */
+.adm-table-wrap{overflow-x:auto;margin:8px 0 12px}
+.adm-table{border-collapse:collapse;width:100%;font-size:.9rem}
+.adm-table th,.adm-table td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.adm-table thead th{font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.adm-table .num{text-align:right}
+.adm-table tr.total th,.adm-table tr.total td{font-weight:800;border-bottom:0}
+.adm-bars{list-style:none;margin:6px 0}
+.adm-bars li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)}
+
+/* rows (responses, support) */
+.adm-rows{list-style:none;margin:12px 0;display:grid;gap:10px}
+.adm-row{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}
+.adm-row.is-done{opacity:.72}
+.adm-row-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;margin-bottom:8px}
+.adm-chip{display:inline-block;color:#fff;font-weight:800;font-size:.78rem;padding:3px 11px;border-radius:999px}
+.adm-chip.b3{color:#422006}
+.adm-contact{font-weight:800;font-size:1.05rem;word-break:break-all}
+.adm-dl{display:grid;gap:6px 16px;grid-template-columns:1fr 1fr;margin:0}
+.adm-dl div{min-width:0}.adm-dl dt{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.adm-dl dd{margin:0;font-size:.92rem;overflow-wrap:anywhere}
+.adm-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin:18px 0}
+.adm-actions{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;margin-top:10px}
+
+/* forms */
+.adm-label{display:block;font-weight:600;font-size:.92rem;margin:12px 0 5px}
+.adm-input{display:block;width:100%;padding:11px 12px;border:1.5px solid #b7cdc9;border-radius:10px;background:#fff;
+  font:400 1rem var(--font);color:var(--ink);min-height:46px}
+textarea.adm-input{resize:vertical;min-height:80px}
+.adm-input:focus{outline:3px solid var(--teal-100);border-color:var(--teal-700)}
+.adm-card form .btn-block{margin-top:16px}
+.adm-small{min-height:42px;padding:8px 16px;font-size:.92rem}
+.adm-q{border:1px solid var(--line);border-radius:12px;padding:6px 14px 14px;margin:0 0 12px;min-width:0}
+.adm-q legend{font-weight:800;color:var(--teal-900);padding:0 6px}
+.adm-opts{list-style:none;display:grid;gap:8px}
+.adm-opts li{display:flex;align-items:center;gap:10px}
+.adm-opts .adm-input{flex:1 1 auto;min-width:0}
+.adm-pts{flex:0 0 auto;white-space:nowrap}
+.adm-locked{flex:1 1 auto;padding:10px 12px;background:#f1f5f4;border-radius:10px;color:var(--muted)}
+.adm-two{display:grid;grid-template-columns:1fr;gap:0 14px}
+.adm-check{display:flex;align-items:center;gap:10px;margin-top:14px;font-weight:600;font-size:.92rem}
+.adm-check input{width:20px;height:20px;accent-color:var(--teal-700)}
+.adm-edit{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:10px 0;background:#fcfefd}
+.adm-edit>summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-weight:600}
+.adm-edit form{margin-top:6px}
+.adm-confirm summary{cursor:pointer}
+.adm-danger-link{color:#b91c1c;font-weight:700;font-size:.92rem;text-decoration:underline;padding:8px 2px;display:inline-block}
+.adm-confirm[open]{padding:8px 0}
+.adm-btn-danger{background:#b91c1c;color:#fff;border-color:#b91c1c}
+.adm-btn-danger:hover{background:#991b1b}
+
+/* sign in */
+.adm-login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px var(--gutter)}
+.adm-login .adm-card{width:100%;max-width:380px}
+.adm-login .adm-logo{display:block;margin-bottom:14px}
+
+@media (min-width:640px){
+  .adm-grid{grid-template-columns:repeat(4,1fr)}
+  .adm-grid.two{grid-template-columns:1fr 1fr}
+  .adm-dl{grid-template-columns:repeat(3,1fr)}
+  .adm-two{grid-template-columns:1fr 1fr}
+  .adm-card{padding:22px}
+}

@@ -243,3 +243,9 @@ a:focus-visible,button:focus-visible{outline:3px solid #134e4a;outline-offset:3p
 .cta-center .btn-solid{background:var(--lvl,var(--teal-700))}
 .cta-center .btn-solid:hover{filter:brightness(.92)}
 .cta-center .btn-outline{color:var(--lvl,var(--teal-800));border-color:var(--lvl,var(--teal-700))}
+
+/* ---- Footer contacts and social links (set from /admin/contacts) ---- */
+.footer-contact a,.footer-socials a{color:#fff;font-weight:600}
+.footer-socials{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:14px}
+.footer-socials a{display:inline-block;padding:6px 0}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}

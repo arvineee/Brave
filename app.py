@@ -6,12 +6,16 @@ Pages
   /response  the personalised response, /response?score=1..5 (default 3)
   POST /api/checkin   stores the anonymous result (and an opt-in support request)
 
+  /admin/*  staff dashboard (see dashboard.py); off unless ADMIN_PASSWORD_HASH and
+            ADMIN_SECRET_KEY are set
+
 Storage (Flask-SQLAlchemy): DATABASE_URL, e.g. postgresql://user:pass@host/db.
 Without it a local SQLite file is used for development. Two separate tables:
 `checkins` is anonymous (day, score, multiple-choice answers); `support_requests`
 holds a contact only when the student typed one AND ticked consent, with no link
-to any check-in. Free-text reflections are never sent or stored. No cookies,
-no sessions, no analytics.
+to any check-in. Free-text reflections are never sent or stored. Public pages set no
+cookies, no sessions, no analytics. The only cookie is the staff login cookie, which is
+limited to the path /admin.
 """
 import logging
 import os
@@ -19,11 +23,13 @@ import secrets
 import time
 from datetime import datetime, timedelta, timezone
 
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import Flask, g, jsonify, redirect, render_template, request, url_for
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+import dashboard
+import siteconfig
 import trial
 
 from content import CRISIS, DEFAULT_SCORE, FORM, LOCKED, RESPONSES, SITE, WANTS_SUPPORT
@@ -48,6 +54,7 @@ class Checkin(db.Model):
     support_now = db.Column(db.String(20), nullable=False)
     support_type = db.Column(db.String(80))
     channel = db.Column(db.String(20))
+    hour = db.Column(db.Integer)  # Kenya-time hour 0-23, so staff can see when students check in
     __table_args__ = (
         db.CheckConstraint("score BETWEEN 1 AND 5", name="ck_score"),
         db.CheckConstraint("connection BETWEEN 0 AND 10", name="ck_connection"),
@@ -62,6 +69,36 @@ class SupportRequest(db.Model):
     support_type = db.Column(db.String(80), nullable=False)
     channel = db.Column(db.String(20), nullable=False)
     contact = db.Column(db.String(120), nullable=False)
+    handled = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+
+
+class SiteSetting(db.Model):
+    """Staff-edited wording, contacts and socials, layered over content.py (see siteconfig.py)."""
+    __tablename__ = "site_settings"
+    key = db.Column(db.String(40), primary_key=True)
+    value = db.Column(db.Text, nullable=False)
+
+
+class CustomQuestion(db.Model):
+    """Extra questions added by staff. Never scored: they do not change the 1-5 level."""
+    __tablename__ = "custom_questions"
+    id = db.Column(db.Integer, primary_key=True)
+    prompt = db.Column(db.String(200), nullable=False)
+    kind = db.Column(db.String(10), nullable=False)       # choice | multi | scale
+    options = db.Column(db.Text, nullable=False)
+    required = db.Column(db.Integer, nullable=False, default=0)
+    active = db.Column(db.Integer, nullable=False, default=1)
+    position = db.Column(db.Integer, nullable=False, default=0)
+
+
+class CustomAnswer(db.Model):
+    """One row per chosen option. Anonymous like the check-in it belongs to."""
+    __tablename__ = "custom_answers"
+    id = db.Column(db.Integer, primary_key=True)
+    checkin_id = db.Column(db.Integer, db.ForeignKey("checkins.id", ondelete="CASCADE"),
+                           nullable=False, index=True)
+    question_id = db.Column(db.Integer, nullable=False, index=True)
+    answer = db.Column(db.String(200), nullable=False)
 
 
 class License(db.Model):
@@ -92,6 +129,25 @@ def install_triggers():
     except SQLAlchemyError:
         db.session.rollback()  # another worker may be creating them at the same moment
         log.warning("license triggers not (re)created", exc_info=True)
+
+
+def ensure_columns():
+    """create_all() adds new tables but not new columns on existing ones. Add them here so the
+    live database upgrades itself on the first start of this version."""
+    wanted = {"checkins": (("hour", "INTEGER"),),
+              "support_requests": (("handled", "INTEGER NOT NULL DEFAULT 0"),)}
+    have = inspect(db.engine)
+    for table, cols in wanted.items():
+        existing = {c["name"] for c in have.get_columns(table)}
+        for name, ddl in cols:
+            if name in existing:
+                continue
+            try:  # table and column names are constants above, never user input
+                db.session.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+                db.session.commit()
+            except SQLAlchemyError:
+                db.session.rollback()  # another worker may have added it a moment ago
+                log.warning("could not add %s.%s", table, name, exc_info=True)
 
 
 def start_trial(secret):
@@ -147,14 +203,16 @@ def parse_score(raw):
 ALLOWED = {key: {label for label, _ in opts} for key, opts in FORM.items()}
 
 
-def clean_checkin(data):
+def clean_checkin(data, allowed=None):
     """Validate the JSON body. Returns (checkin_dict, request_dict_or_None) or None.
 
     Strict allow-list: only known option labels are accepted; any other field
-    (including stray free text) is ignored and never stored.
+    (including stray free text) is ignored and never stored. `allowed` lets the app pass
+    the labels staff have reworded; it defaults to the labels in content.py.
     """
     if not isinstance(data, dict):
         return None
+    ALLOWED = allowed or globals()["ALLOWED"]
 
     def is_int(v):
         return isinstance(v, int) and not isinstance(v, bool)
@@ -200,11 +258,20 @@ def clean_checkin(data):
 
 def create_app(config=None):
     app = Flask(__name__)
-    # No SECRET_KEY and no `session`: Flask never sets a cookie.
+    # Public pages never touch `session`, so Flask sets no cookie on them. The staff dashboard
+    # is the only user of sessions: a signed cookie limited to /admin (see dashboard.py).
     app.config.update(
         SQLALCHEMY_DATABASE_URI=database_uri(),
         SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True},
-        MAX_CONTENT_LENGTH=4096,
+        MAX_CONTENT_LENGTH=8192,
+        SECRET_KEY=os.environ.get("ADMIN_SECRET_KEY") or None,
+        ADMIN_PASSWORD_HASH=os.environ.get("ADMIN_PASSWORD_HASH", ""),
+        SESSION_COOKIE_NAME="brave_admin",
+        SESSION_COOKIE_PATH="/admin",
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Strict",
+        SESSION_COOKIE_SECURE=os.environ.get("ADMIN_COOKIE_SECURE", "1") != "0",  # 0 = local http
+        PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
         LICENSE_SECRET=os.environ.get("LICENSE_SECRET", ""),  # server env only, never in the repo
         TRIAL_DAYS=int(os.environ.get("TRIAL_DAYS", "40")),
         SITE_URL=os.environ.get("SITE_URL", "").rstrip("/"),  # e.g. https://mapenzi.example.org
@@ -214,7 +281,25 @@ def create_app(config=None):
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        ensure_columns()
         install_triggers()
+
+    def get_config():
+        """Effective wording, contacts and custom questions for this request. Any database
+        problem falls back to the defaults in content.py, so crisis resources always render."""
+        cfg = getattr(g, "site_cfg", None)
+        if cfg is None:
+            try:
+                settings = {r.key: r.value for r in SiteSetting.query.all()}
+                rows = [{"id": q.id, "prompt": q.prompt, "kind": q.kind, "options": q.options,
+                         "required": q.required, "active": q.active, "position": q.position}
+                        for q in CustomQuestion.query.all()]
+            except SQLAlchemyError:
+                db.session.rollback()
+                log.warning("site settings unavailable; using defaults", exc_info=True)
+                settings, rows = {}, []
+            cfg = g.site_cfg = siteconfig.build(settings, rows)
+        return cfg
 
 
     failed_keys = []  # in-memory timestamps of wrong keys (no IP or user data kept)
@@ -241,15 +326,16 @@ def create_app(config=None):
 
     @app.get("/locked")
     def locked():
-        return render_template("locked.html", crisis=CRISIS, site=SITE, L=LOCKED, error=None)
+        return render_template("locked.html", crisis=get_config()["crisis"], site=SITE,
+                               L=LOCKED, error=None)
 
     @app.post("/unlock")
     def unlock():
         now = time.time()
         failed_keys[:] = [t for t in failed_keys if now - t < 600]
         if len(failed_keys) >= 10:
-            return render_template("locked.html", crisis=CRISIS, site=SITE, L=LOCKED,
-                                   error=LOCKED["too_many"]), 429
+            return render_template("locked.html", crisis=get_config()["crisis"], site=SITE,
+                                   L=LOCKED, error=LOCKED["too_many"]), 429
         secret = app.config["LICENSE_SECRET"]
         row = db.session.get(License, 1)
         valid = (row is not None and secret and
@@ -262,10 +348,15 @@ def create_app(config=None):
             db.session.commit()
             return redirect(url_for("home"))
         failed_keys.append(now)
-        return render_template("locked.html", crisis=CRISIS, site=SITE, L=LOCKED,
-                               error=LOCKED["wrong_key"]), 403
+        return render_template("locked.html", crisis=get_config()["crisis"], site=SITE,
+                               L=LOCKED, error=LOCKED["wrong_key"]), 403
 
     NOINDEX_ENDPOINTS = {"response", "locked", "unlock", "api_checkin"}
+
+    @app.context_processor
+    def footer_context():
+        cfg = get_config()
+        return {"contacts": cfg["contacts"], "socials": cfg["socials"]}
 
     def site_url():
         return app.config["SITE_URL"] or request.url_root.rstrip("/")
@@ -293,7 +384,7 @@ def create_app(config=None):
 
     @app.get("/robots.txt")
     def robots():
-        body = f"User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: {site_url()}/sitemap.xml\n"
+        body = f"User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin/\n\nSitemap: {site_url()}/sitemap.xml\n"
         return app.response_class(body, mimetype="text/plain")
 
     @app.get("/sitemap.xml")
@@ -305,35 +396,47 @@ def create_app(config=None):
 
     @app.route("/")
     def home():
-        return render_template("home.html", site=SITE, crisis=CRISIS)
+        return render_template("home.html", site=SITE, crisis=get_config()["crisis"])
 
     @app.route("/checkin")
     def checkin():
-        return render_template("checkin.html", f=FORM, crisis=CRISIS, site=SITE,
+        cfg = get_config()
+        return render_template("checkin.html", f=cfg["form"], p=cfg["prompts"],
+                               custom=cfg["custom"], crisis=cfg["crisis"], site=SITE,
                                wants_support=list(WANTS_SUPPORT))
 
     @app.route("/response")
     def response():
         score = parse_score(request.args.get("score"))
         return render_template(
-            "response.html", score=score, r=RESPONSES[score], crisis=CRISIS,
+            "response.html", score=score, r=RESPONSES[score], crisis=get_config()["crisis"],
             site=SITE, is_crisis=(score == 5),
         )
 
     @app.post("/api/checkin")
     def api_checkin():
-        cleaned = clean_checkin(request.get_json(silent=True))
+        body = request.get_json(silent=True)
+        cfg = get_config()
+        cleaned = clean_checkin(body, cfg["allowed"])
         if cleaned is None:
             return jsonify(error="invalid"), 400
         c, req = cleaned
-        day = datetime.now(EAT).date().isoformat()
+        answers = siteconfig.clean_custom_answers(body.get("custom"), cfg["custom"])
+        if answers is None:
+            return jsonify(error="invalid"), 400
+        now = datetime.now(EAT)
+        day = now.date().isoformat()
         try:
-            db.session.add(Checkin(
-                day=day, score=c["score"], energy=c["energy"], sleep=c["sleep"],
+            row = Checkin(
+                day=day, hour=now.hour, score=c["score"], energy=c["energy"], sleep=c["sleep"],
                 connection=c["connection"], kept_up="; ".join(c["kept_up"]),
                 support_now=c["support_now"], support_type=c["support_type"],
                 channel=c["channel"],
-            ))
+            )
+            db.session.add(row)
+            db.session.flush()  # gives `row` its id for the extra answers
+            for qid, answer in answers:
+                db.session.add(CustomAnswer(checkin_id=row.id, question_id=qid, answer=answer))
             if req:
                 db.session.add(SupportRequest(
                     day=day, support_type=c["support_type"], channel=c["channel"],
@@ -359,13 +462,19 @@ def create_app(config=None):
             "img-src 'self' data:; connect-src 'self'; base-uri 'none'; "
             "form-action 'self'; frame-ancestors 'none'"
         )
-        if request.endpoint in NOINDEX_ENDPOINTS:  # private result pages never go in search
+        ep = request.endpoint or ""
+        if ep in NOINDEX_ENDPOINTS or ep.startswith("admin_"):  # private pages never go in search
             resp.headers["X-Robots-Tag"] = "noindex, nofollow"
         if request.endpoint == "static":
             resp.headers["Cache-Control"] = "public, max-age=3600"
         else:  # pages differ by query string; keep them out of shared caches
             resp.headers["Cache-Control"] = "no-store"
         return resp
+
+    dashboard.register(app, dashboard.Deps(
+        db=db, Checkin=Checkin, SupportRequest=SupportRequest, SiteSetting=SiteSetting,
+        CustomQuestion=CustomQuestion, CustomAnswer=CustomAnswer, get_config=get_config,
+        eat=EAT))
 
     return app
 

@@ -7,8 +7,11 @@
     python admin.py starttrial            start the clock on a site that already has check-ins
     python admin.py genkey                print the activation key for this install
                                           (needs LICENSE_SECRET in the environment)
+    python admin.py hashpw                choose the password for the /admin dashboard and print
+                                          the ADMIN_PASSWORD_HASH value to put on the server
 """
 import argparse
+import getpass
 from datetime import datetime, timedelta
 
 from sqlalchemy import func
@@ -71,6 +74,18 @@ def genkey():
     print(trial.activation_key(secret, row.install_id))
 
 
+def hashpw():
+    from werkzeug.security import generate_password_hash
+    pw = getpass.getpass("New admin password (min 12 characters): ")
+    if len(pw) < 12:
+        raise SystemExit("Too short: use at least 12 characters.")
+    if getpass.getpass("Repeat it: ") != pw:
+        raise SystemExit("The two entries differ; nothing printed.")
+    print("\nSet this in the server environment (PythonAnywhere: the WSGI file), single-quoted:")
+    print(f"  ADMIN_PASSWORD_HASH='{generate_password_hash(pw)}'")
+    print("You also need ADMIN_SECRET_KEY, e.g.:  python -c \"import secrets; print(secrets.token_hex(32))\"")
+
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -79,9 +94,13 @@ if __name__ == "__main__":
     sub.add_parser("license")
     sub.add_parser("genkey")
     sub.add_parser("starttrial")
+    sub.add_parser("hashpw")
     pg = sub.add_parser("purge")
     pg.add_argument("--days", type=int, required=True)
     a = p.parse_args()
+    if a.cmd == "hashpw":  # only asks for a password; no query is run
+        hashpw()
+        raise SystemExit(0)
     with app.app_context():
         if a.cmd == "stats":
             stats()

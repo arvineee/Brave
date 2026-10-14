@@ -3,6 +3,7 @@
  * - sends ONE anonymous summary to /api/checkin: multiple-choice answers and score only.
  *   The free-text reflections are never sent. A contact is sent only if the student
  *   typed one AND ticked consent.
+ * - extra questions added by staff (not scored) are sent as multiple-choice answers only.
  * - the response page always opens, even if the network call fails or is slow.
  */
 (function () {
@@ -34,9 +35,42 @@
     consent.required = hasContact;
   }
 
-  form.addEventListener("change", function () { syncKeptUp(); sync(); });
+  // Extra "pick any" questions marked required: at least one box must be ticked.
+  var cqGroups = form.querySelectorAll("[data-cq-group]");
+  function syncCustom() {
+    for (var g = 0; g < cqGroups.length; g++) {
+      var id = cqGroups[g].getAttribute("data-cq-group");
+      var cbs = form.querySelectorAll('input[data-cq-box="' + id + '"]');
+      var any = false, k;
+      for (k = 0; k < cbs.length; k++) if (cbs[k].checked) any = true;
+      var need = cqGroups[g].getAttribute("data-required") === "1" && !any;
+      for (k = 0; k < cbs.length; k++) cbs[k].required = need;
+    }
+  }
+
+  function collectCustom() {
+    var out = {}, n = 0, i, k;
+    var sels = form.querySelectorAll("select[data-cq]");
+    for (i = 0; i < sels.length; i++) {
+      if (sels[i].selectedIndex > 0) {
+        out[sels[i].getAttribute("data-cq")] =
+          sels[i].getAttribute("data-kind") === "scale" ? Number(sels[i].value) : sels[i].value;
+        n++;
+      }
+    }
+    for (i = 0; i < cqGroups.length; i++) {
+      var id = cqGroups[i].getAttribute("data-cq-group");
+      var cbs = form.querySelectorAll('input[data-cq-box="' + id + '"]');
+      var picked = [];
+      for (k = 0; k < cbs.length; k++) if (cbs[k].checked) picked.push(cbs[k].getAttribute("data-cq-label"));
+      if (picked.length) { out[id] = picked; n++; }
+    }
+    return n ? out : null;
+  }
+
+  form.addEventListener("change", function () { syncKeptUp(); sync(); syncCustom(); });
   contact.addEventListener("input", sync);
-  syncKeptUp(); sync();
+  syncKeptUp(); sync(); syncCustom();
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
@@ -63,6 +97,8 @@
       payload.support_type = label(q8);
       payload.channel = label(q9);
     }
+    var extra = collectCustom();
+    if (extra) payload.custom = extra;
     var c = contact.value.trim();
     if (c && consent.checked) payload.request = { contact: c, consent: true };
 
