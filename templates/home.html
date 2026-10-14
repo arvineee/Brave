@@ -1,12 +1,4 @@
 {% extends "base.html" %}
-{% set seo_title = "Mapenzi ya 30 | Private Weekly Student Wellness Check-in" %}
-{% set seo_description = "A private, three-minute weekly mental wellness check-in for students in Kenya. No login, no cookies, no tracking. By #IAMBRAVE, Jagora Health Organization." %}
-{% block title %}{{ seo_title }}{% endblock %}
-{% block description %}{{ seo_description }}{% endblock %}
-{% block robots %}index, follow, max-image-preview:large{% endblock %}
-{% block seo %}{% include "_seo.html" %}
-<script type="application/ld+json">{{ jsonld|tojson }}</script>
-{% endblock %}
 {% block content %}
 <section class="hero">
   <div class="wrap hero-grid">

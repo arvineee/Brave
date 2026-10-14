@@ -1,10 +1,5 @@
 {% extends "base.html" %}
-{% set seo_title = "Weekly Mental Wellness Check-in | Mapenzi ya 30" %}
-{% set seo_description = "Take the three-minute Mapenzi ya 30 check-in. We never ask for your name, and what you write stays on your phone." %}
-{% block title %}{{ seo_title }}{% endblock %}
-{% block description %}{{ seo_description }}{% endblock %}
-{% block robots %}index, follow, max-image-preview:large{% endblock %}
-{% block seo %}{% include "_seo.html" %}{% endblock %}
+{% block title %}Weekly check-in | Mapenzi ya 30 | #IAMBRAVE{% endblock %}
 {% block content %}
 <div class="wrap narrow">
   <header class="page-head">
@@ -91,7 +86,7 @@
 
       <div id="support-extra">
         <div class="field">
-          <label for="q8">8. What kind of support would help most right now? <span class="req" aria-hidden="true">*</span></label>
+          <label for="q8">8. What kind of support would help most right now? <span class="opt">(if you&rsquo;d like support)</span></label>
           <select id="q8">
             <option value="" disabled selected>Select support type</option>
             {% for o in f.support_type %}<option value="{{ o[1] }}">{{ o[0] }}</option>{% endfor %}
@@ -99,7 +94,7 @@
         </div>
 
         <div class="field">
-          <label for="q9">9. How should support reach you? <span class="req" aria-hidden="true">*</span></label>
+          <label for="q9">9. How should support reach you? <span class="opt">(if you&rsquo;d like support)</span></label>
           <select id="q9">
             <option value="" disabled selected>Select channel</option>
             {% for o in f.channel %}<option value="{{ o[1] }}">{{ o[0] }}</option>{% endfor %}
@@ -107,13 +102,13 @@
         </div>
 
         <div class="field">
-          <label for="q10">10. Best contact to reach you on <span class="opt">(optional)</span></label>
+          <label for="q10">10. Best contact to reach you on <span class="opt">(optional, so Brave can reach you)</span></label>
           <input id="q10" type="text" maxlength="120" autocomplete="off" placeholder="Phone number, handle or email">
           <label class="check consent">
             <input id="consent" type="checkbox"><span>I agree that Brave may contact me using the details above. They are
               saved separately from my answers and used only to reach me.</span>
           </label>
-          <p class="note">Leave this blank if you would rather not be contacted. You will still get your response.</p>
+          <p class="note">Leave this blank if you would rather not be contacted. If you add a contact, please also choose questions 8 and 9. You will still get your response either way.</p>
         </div>
       </div>
     </fieldset>

@@ -10,8 +10,7 @@ from app import Checkin, SupportRequest, clean_checkin, create_app, db
 
 @pytest.fixture
 def app(tmp_path):
-    a = create_app({"TESTING": True, "LICENSE_SECRET": "test-secret",
-                    "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 't.db'}"})
+    a = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 't.db'}"})
     return a
 
 
@@ -112,11 +111,7 @@ def test_no_cookies_no_external_resources(client, path):
     r = client.get(path)
     assert "Set-Cookie" not in r.headers
     html = r.get_data(as_text=True)
-    # Canonical / Open Graph / Twitter tags and JSON-LD are metadata for crawlers
-    # and must be absolute URLs; they load nothing. Everything else stays same-origin.
-    body = re.sub(r'<script type="application/ld\+json">.*?</script>', "", html, flags=re.S)
-    body = re.sub(r'<(?:meta\b|link rel="canonical")[^>]*>', "", body)
-    assert "http://" not in body and "https://" not in body
+    assert "http://" not in html and "https://" not in html
     assert "<script>" not in html  # no inline script
     assert "analytics" not in html.lower()
     assert "script-src 'self'" in r.headers["Content-Security-Policy"]
@@ -183,9 +178,34 @@ def test_support_request_rejected_without_valid_consent(app, client, req):
         assert Checkin.query.count() == 0 and SupportRequest.query.count() == 0
 
 
-def test_contact_without_asking_for_support_is_rejected(client):
+def test_contact_is_accepted_even_if_support_answer_was_no(app, client):
+    body = valid(support_type="Other:", channel="SMS", request={"contact": "0711", "consent": True})
+    assert client.post("/api/checkin", json=body).status_code == 204
+    with app.app_context():
+        assert SupportRequest.query.one().channel == "SMS"
+
+
+def test_contact_needs_support_preferences(client):
     r = client.post("/api/checkin", json=valid(request={"contact": "0711", "consent": True}))
     assert r.status_code == 400
+
+
+def test_contact_box_is_always_visible(client):
+    html = client.get("/checkin").get_data(as_text=True)
+    assert 'id="q10"' in html and 'id="consent"' in html
+    assert not re.search(r"(?<![-\w])hidden(?![-\w])", html.replace('type="hidden"', ""))
+    assert "10. Best contact" in html
+
+
+@pytest.mark.parametrize("score,tone", [(1, "tone-thriving"), (2, "tone-steady"), (3, "tone-strain"),
+                                        (4, "tone-struggling"), (5, "tone-crisis")])
+def test_scores_are_colour_graded(client, score, tone):
+    html = client.get(f"/response?score={score}").get_data(as_text=True)
+    assert tone in html
+    assert f"Level {score} of 5" in html
+    assert html.count(' on"') == score  # segments filled up to the score
+    css = client.get("/static/style.css").get_data(as_text=True)
+    assert f".{tone}{{--lvl:" in css
 
 
 @pytest.mark.parametrize("bad", [
@@ -252,109 +272,3 @@ def run_score(answers):
 ])
 def test_scoring(answers, expected):
     assert run_score(answers) == expected
-
-
-# ---------- 40-day trial lock ----------
-def _age_trial(app, days):
-    """Test helper: move the start back by rewriting the row with a valid signature."""
-    import trial
-    from datetime import timedelta
-    from sqlalchemy import text
-    from app import License
-    with app.app_context():
-        client_state = app.test_client().get("/")  # starts the trial
-        row = db.session.get(License, 1)
-        started = trial.stamp(trial.parse(row.started_at) - timedelta(days=days))
-        sig = trial.sign("test-secret", row.install_id, started, started, 0)
-        # triggers forbid this on purpose; drop them just for the test
-        db.session.execute(text("DROP TRIGGER license_no_tamper"))
-        db.session.execute(text(
-            "UPDATE license SET started_at=:s, last_seen=:s, sig=:g"), {"s": started, "g": sig})
-        db.session.commit()
-        return row.install_id
-
-
-def test_trial_starts_and_site_is_open(client):
-    assert client.get("/").status_code == 200
-
-
-def test_expired_trial_locks_pages_but_keeps_crisis(app, client):
-    _age_trial(app, 41)
-    r = client.get("/checkin")
-    assert r.status_code == 302 and r.headers["Location"].endswith("/locked")
-    page = client.get("/locked").get_data(as_text=True)
-    assert "0722 178 177" in page and 'id="crisis"' in page
-    assert client.get("/response?score=5").status_code == 200
-    assert client.post("/api/checkin", json=valid()).status_code == 503
-
-
-def test_wrong_key_rejected_right_key_unlocks(app, client):
-    import trial
-    iid = _age_trial(app, 41)
-    assert client.post("/unlock", data={"key": "AAAA-AAAA-AAAA-AAAA-AAAA"}).status_code == 403
-    key = trial.activation_key("test-secret", iid)
-    assert client.post("/unlock", data={"key": key}).status_code == 302
-    assert client.get("/checkin").status_code == 200
-
-
-def test_row_edits_are_blocked_by_database(app, client):
-    from sqlalchemy import text
-    from sqlalchemy.exc import SQLAlchemyError
-    client.get("/")
-    with app.app_context():
-        for sql in ("DELETE FROM license", "UPDATE license SET started_at='2099-01-01T00:00:00Z'"):
-            with pytest.raises(SQLAlchemyError):
-                db.session.execute(text(sql))
-            db.session.rollback()
-
-
-def test_hand_edited_row_without_secret_locks(app, client):
-    from sqlalchemy import text
-    client.get("/")
-    with app.app_context():
-        db.session.execute(text("UPDATE license SET activated=1"))  # allowed by trigger, bad sig
-        db.session.commit()
-    assert client.get("/checkin").status_code == 302
-
-
-def test_missing_secret_fails_closed(tmp_path):
-    a = create_app({"TESTING": True, "LICENSE_SECRET": "",
-                    "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'n.db'}"})
-    assert a.test_client().get("/checkin").status_code == 302
-
-
-# ---------- SEO ----------
-def test_home_and_checkin_are_indexable_with_meta(client):
-    for path in ("/", "/checkin"):
-        h = client.get(path).get_data(as_text=True)
-        assert 'content="index, follow' in h and "noindex" not in h
-        assert f'<link rel="canonical" href="http://localhost{path}">' in h
-        assert 'property="og:image"' in h and 'name="twitter:card"' in h
-
-
-def test_home_has_valid_jsonld(client):
-    h = client.get("/").get_data(as_text=True)
-    raw = re.search(r'<script type="application/ld\+json">(.*?)</script>', h, re.S).group(1)
-    data = json.loads(raw.replace("\\u0027", "'"))
-    assert {n["@type"] for n in data["@graph"]} == {"Organization", "WebSite"}
-
-
-def test_private_pages_are_noindex(client):
-    for path in ("/response?score=3", "/locked"):
-        r = client.get(path)
-        assert "noindex" in r.headers["X-Robots-Tag"]
-        assert 'content="noindex, nofollow"' in r.get_data(as_text=True)
-
-
-def test_robots_and_sitemap(client):
-    r = client.get("/robots.txt").get_data(as_text=True)
-    assert "Sitemap: http://localhost/sitemap.xml" in r and "Disallow: /api/" in r
-    s = client.get("/sitemap.xml").get_data(as_text=True)
-    assert "<loc>http://localhost/</loc>" in s and "/response" not in s
-
-
-def test_robots_and_sitemap_stay_open_when_locked(app, client):
-    _age_trial(app, 41)
-    assert client.get("/robots.txt").status_code == 200
-    assert client.get("/sitemap.xml").status_code == 200
-

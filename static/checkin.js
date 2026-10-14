@@ -11,7 +11,7 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var wantsSupport = (form.getAttribute("data-wants-support") || "").split("|");
-  var extra = $("support-extra"), q7 = $("q7"), q8 = $("q8"), q9 = $("q9");
+  var q7 = $("q7"), q8 = $("q8"), q9 = $("q9");
   var contact = $("q10"), consent = $("consent");
   var boxes = form.querySelectorAll("input[data-label]");
 
@@ -25,19 +25,18 @@
     for (i = 0; i < boxes.length; i++) boxes[i].required = !any;
   }
 
-  // Support questions only appear when the student wants support.
-  function syncSupport() {
-    var show = q7.selectedIndex > 0 && wantsSupport.indexOf(label(q7)) !== -1;
-    extra.hidden = !show;
-    q8.required = q9.required = show;
+  // Questions 8 and 9 are needed when the student wants support or leaves a contact.
+  // A contact also needs consent. The contact box itself is always visible.
+  function sync() {
+    var wants = q7.selectedIndex > 0 && wantsSupport.indexOf(label(q7)) !== -1;
+    var hasContact = contact.value.trim() !== "";
+    q8.required = q9.required = wants || hasContact;
+    consent.required = hasContact;
   }
 
-  // A contact needs consent.
-  function syncConsent() { consent.required = contact.value.trim() !== ""; }
-
-  form.addEventListener("change", function () { syncKeptUp(); syncSupport(); syncConsent(); });
-  contact.addEventListener("input", syncConsent);
-  syncKeptUp(); syncSupport(); syncConsent();
+  form.addEventListener("change", function () { syncKeptUp(); sync(); });
+  contact.addEventListener("input", sync);
+  syncKeptUp(); sync();
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
@@ -60,12 +59,12 @@
       score: score, energy: label($("q1")), sleep: label($("q3")), connection: connection,
       kept_up: kept, support_now: label(q7)
     };
-    if (!extra.hidden) {
+    if (q8.selectedIndex > 0 && q9.selectedIndex > 0) {
       payload.support_type = label(q8);
       payload.channel = label(q9);
-      var c = contact.value.trim();
-      if (c && consent.checked) payload.request = { contact: c, consent: true };
     }
+    var c = contact.value.trim();
+    if (c && consent.checked) payload.request = { contact: c, consent: true };
 
     var btn = $("submit-btn");
     btn.disabled = true;
