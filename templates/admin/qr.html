@@ -1,8 +1,18 @@
 {% extends "admin/base.html" %}
 {% block title %}QR code{% endblock %}
 {% block content %}
-<h1 class="adm-h1">QR code</h1>
-<p class="adm-muted">The code is drawn again from the address below every time this page loads. If the site moves to a new address, change it here and the code follows, so the printed code can be replaced at any time.</p>
+<h1 class="adm-h1">QR codes</h1>
+{% if schools %}
+<section class="adm-card" aria-labelledby="sq-h">
+  <h2 class="adm-h2" id="sq-h">School codes</h2>
+  <p class="adm-muted">Each school's code opens its own check-in and prints the school's name under the code. Give each school its own.</p>
+  <ul class="adm-rows">{% for s in schools %}
+    <li class="adm-row"><div class="adm-row-head"><span>{{ s.name }}{% if not s.active %} <span class="adm-muted">(switched off)</span>{% endif %}</span><a class="btn btn-outline adm-small" href="{{ url_for('admin_school_qr', sid=s.id) }}">QR code</a></div></li>
+  {% endfor %}</ul>
+</section>
+{% endif %}
+<h2 class="adm-h2">General code</h2>
+<p class="adm-muted">The general code has no school name, so its check-ins are shown as "Unassigned". The codes are drawn again from the address below every time this page loads. If the site moves to a new address, change it here and the code follows, so the printed code can be replaced at any time.</p>
 
 <section class="adm-card" aria-labelledby="qa-h">
   <h2 class="adm-h2" id="qa-h">Address the code opens</h2>
@@ -11,7 +21,7 @@
   {% endif %}
   <form method="post" action="{{ url_for('admin_qr_save') }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label class="adm-label" for="qr-url">Check-in address (full web address, starting https://)</label>
+    <label class="adm-label" for="qr-url">Check-in address (full web address, starting https://). The school codes use the same site address.</label>
     <input class="adm-input" id="qr-url" name="url" type="url" value="{{ url }}" maxlength="200" required placeholder="https://mapenzi.example.org/checkin" autocomplete="off">
     <button class="btn btn-solid btn-block" type="submit">Save address and update the QR code</button>
   </form>

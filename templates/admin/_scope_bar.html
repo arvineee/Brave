@@ -1,0 +1,15 @@
+{# Administrator: pick one school or all of them. Managers just see their school's name. #}
+{% if me.role == 'admin' and pick %}
+<form method="get" class="adm-scope adm-noprint">
+  {% for k in ['range', 'score', 'from', 'to'] %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
+  <label class="adm-muted" for="sf">School:</label>
+  <select class="adm-input" id="sf" name="school">
+    <option value="">All schools</option>
+    <option value="none"{% if scope.kind == 'none' %} selected{% endif %}>Unassigned (general link)</option>
+    {% for s in pick %}<option value="{{ s.id }}"{% if scope.school_id == s.id %} selected{% endif %}>{{ s.name }}{% if not s.active %} (off){% endif %}</option>{% endfor %}
+  </select>
+  <button class="btn btn-outline adm-small" type="submit">Show</button>
+</form>
+{% elif me.role == 'manager' %}
+<p class="adm-scope adm-muted">Showing <strong>{{ scope.label }}</strong> only.</p>
+{% endif %}

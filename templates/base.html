@@ -20,7 +20,7 @@
         {% include "_logo.html" %}
       </a>
       <nav class="nav" aria-label="Main">
-        <a class="nav-link" href="{{ url_for('checkin') }}">Check-in</a>
+        <a class="nav-link" href="{{ url_for('school_checkin', slug=school.slug) if school else url_for('checkin') }}">Check-in</a>
         <a class="nav-help" href="#crisis">Get help</a>
       </nav>
     </div>

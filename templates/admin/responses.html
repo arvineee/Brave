@@ -2,19 +2,20 @@
 {% block title %}Responses{% endblock %}
 {% block content %}
 <h1 class="adm-h1">Responses</h1>
+{% include "admin/_scope_bar.html" %}
 <p class="adm-note">Each row is one anonymous check-in. You see the day, the part of day, the level and the multiple-choice answers.
   <strong>What students type in the two reflection boxes is never sent to the server</strong>, as the home page promises, so it cannot be shown here.</p>
 
 <nav class="adm-range" aria-label="Filter by level">
   <span class="adm-muted">Level:</span>
-  <a href="{{ url_for('admin_responses') }}"{% if not score %} class="on" aria-current="true"{% endif %}>All</a>
+  <a href="{{ url_for('admin_responses', **sargs) }}"{% if not score %} class="on" aria-current="true"{% endif %}>All</a>
   {% for n, name in levels.items() %}
-  <a href="{{ url_for('admin_responses', score=n) }}"{% if score == n %} class="on" aria-current="true"{% endif %}>{{ n }} {{ name }}</a>
+  <a href="{{ url_for('admin_responses', score=n, **sargs) }}"{% if score == n %} class="on" aria-current="true"{% endif %}>{{ n }} {{ name }}</a>
   {% endfor %}
 </nav>
 
 <p class="adm-muted">{{ total }} check-in{{ '' if total == 1 else 's' }}{% if score %} at level {{ score }}{% endif %}.
-  <a href="{{ url_for('admin_responses_csv', score=score) if score else url_for('admin_responses_csv') }}">Download as CSV</a></p>
+  <a href="{{ url_for('admin_responses_csv', score=score, **sargs) if score else url_for('admin_responses_csv', **sargs) }}">Download as CSV</a></p>
 
 {% if not items %}
 <section class="adm-card"><p>Nothing to show yet.</p></section>
@@ -25,7 +26,7 @@
 <li class="adm-row">
   <div class="adm-row-head">
     <span class="adm-chip b{{ r.score }}">{{ r.score }} &middot; {{ it.level }}</span>
-    <span class="adm-muted">{{ r.day }} &middot; {{ it.part }}</span>
+    <span class="adm-muted">{{ r.day }} &middot; {{ it.part }}{% if me.role == 'admin' %} &middot; {{ it.school }}{% endif %}</span>
   </div>
   <dl class="adm-dl">
     <div><dt>Energy</dt><dd>{{ r.energy }}</dd></div>
@@ -43,9 +44,9 @@
 
 {% if pages > 1 %}
 <nav class="adm-pager" aria-label="Pages">
-  {% if page_no > 1 %}<a class="btn btn-outline" href="{{ url_for('admin_responses', page=page_no - 1, score=score) }}">Newer</a>{% endif %}
+  {% if page_no > 1 %}<a class="btn btn-outline" href="{{ url_for('admin_responses', page=page_no - 1, score=score, **sargs) }}">Newer</a>{% endif %}
   <span class="adm-muted">Page {{ page_no }} of {{ pages }}</span>
-  {% if page_no < pages %}<a class="btn btn-outline" href="{{ url_for('admin_responses', page=page_no + 1, score=score) }}">Older</a>{% endif %}
+  {% if page_no < pages %}<a class="btn btn-outline" href="{{ url_for('admin_responses', page=page_no + 1, score=score, **sargs) }}">Older</a>{% endif %}
 </nav>
 {% endif %}
 {% endblock %}

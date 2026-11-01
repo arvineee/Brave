@@ -18,7 +18,7 @@
     <h2 id="state-title" class="state-title">{{ r.title }}</h2>
     <p class="state-message">{{ r.message }}</p>
     <div class="cta-row cta-center">
-      <a class="btn btn-solid" href="{{ url_for('checkin') }}">Check in again next week</a>
+      <a class="btn btn-solid" href="{{ url_for('school_checkin', slug=school.slug) if school else url_for('checkin') }}">Check in again next week</a>
       <a class="btn btn-outline" href="{{ url_for('home') }}">Back to home</a>
     </div>
   </section>

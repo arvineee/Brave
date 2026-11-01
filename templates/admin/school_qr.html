@@ -1,0 +1,17 @@
+{% extends "admin/base.html" %}
+{% block title %}QR code{% endblock %}
+{% block content %}
+<h1 class="adm-h1">QR code &middot; {{ school.name }}</h1>
+<p class="adm-muted">Students who scan this code open the check-in for {{ school.name }}, and the school's name is shown at the top of the page. The name is also printed under the code.</p>
+{% if not school.active %}<p class="adm-note">This school is switched off, so the code shows a "page not found" until it is switched back on.</p>{% endif %}
+<section class="adm-card adm-qr" aria-labelledby="qc-h">
+  <h2 class="adm-h2" id="qc-h">Current code</h2>
+  <img class="adm-qr-img" src="{{ url_for('admin_school_qr_image', sid=school.id) }}" width="260" alt="QR code for {{ school.name }}, opens {{ url }}">
+  <p class="adm-muted">Opens: <a href="{{ url }}">{{ url }}</a></p>
+  <p class="adm-actions adm-noprint">
+    <a class="btn btn-solid" href="{{ url_for('admin_school_qr_download', sid=school.id) }}">Download SVG (for printing)</a>
+    <button class="btn btn-ghost" type="button" data-print>Print</button>
+  </p>
+  <p class="adm-muted adm-noprint">The SVG file stays sharp at any size, so it can go on posters and flyers.</p>
+</section>
+{% endblock %}

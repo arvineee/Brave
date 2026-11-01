@@ -3,12 +3,13 @@
 {% set seo_description = "Take the three-minute Mapenzi ya 30 check-in. We never ask for your name, and what you write stays on your phone." %}
 {% block title %}{{ seo_title }}{% endblock %}
 {% block description %}{{ seo_description }}{% endblock %}
-{% block robots %}index, follow, max-image-preview:large{% endblock %}
+{% block robots %}{{ "noindex, nofollow" if school else "index, follow, max-image-preview:large" }}{% endblock %}
 {% block seo %}{% include "_seo.html" %}{% endblock %}
 {% block content %}
 <div class="wrap narrow">
   <header class="page-head">
     <p class="eyebrow">Mapenzi ya 30</p>
+    {% if school %}<p class="school-badge" id="school-name">Checking in for <strong>{{ school.name }}</strong></p>{% endif %}
     <h1>Weekly mental wellness check-in</h1>
     <p class="lead-dark">Less than 3 minutes. We never ask for your name, and what you write in the
       reflection boxes stays on your phone.</p>
@@ -17,7 +18,7 @@
   {# Only the connection radios and the preview score carry a name, so a no-JavaScript submit never puts personal text in the URL. #}
   <form id="checkin-form" action="{{ url_for('response') }}" method="get"
         data-response-url="{{ url_for('response') }}" data-api-url="{{ url_for('api_checkin') }}"
-        data-wants-support="{{ wants_support | join('|') }}">
+        data-wants-support="{{ wants_support | join('|') }}"{% if school %} data-school="{{ school.slug }}"{% endif %}>
     <input type="hidden" name="score" value="3">
 
     <fieldset class="panel">

@@ -1,0 +1,78 @@
+{% extends "admin/base.html" %}
+{% block title %}Schools{% endblock %}
+{% block content %}
+<h1 class="adm-h1">Schools</h1>
+<p class="adm-muted">Each school has its own QR code and its own managers. A manager signs in on the normal sign-in page and sees only their school's statistics. You, as administrator, see every school together or one at a time.</p>
+
+<section class="adm-card" aria-labelledby="as-h">
+  <h2 class="adm-h2" id="as-h">Add a school</h2>
+  <form method="post" action="{{ url_for('admin_school_add') }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="adm-label" for="sn">School name (shown to students and printed under the QR code)</label>
+    <input class="adm-input" id="sn" name="name" type="text" maxlength="60" required placeholder="e.g. Kagumo High School" autocomplete="off">
+    <button class="btn btn-solid btn-block" type="submit">Add school</button>
+  </form>
+</section>
+
+{% if not schools %}<section class="adm-card"><p>No schools yet. Check-ins from the general link are shown as "Unassigned".</p></section>{% endif %}
+
+{% for s in schools %}
+<section class="adm-card" aria-labelledby="sc{{ s.id }}-h">
+  <h2 class="adm-h2" id="sc{{ s.id }}-h">{{ s.name }}{% if not s.active %} <span class="adm-muted">(switched off)</span>{% endif %}</h2>
+  <p class="adm-muted">Check-in address: <a href="{{ urls[s.id] }}">{{ urls[s.id] }}</a> &middot; {{ counts.get(s.id, 0) }} check-in{{ '' if counts.get(s.id, 0) == 1 else 's' }}</p>
+  <p class="adm-actions">
+    <a class="btn btn-solid adm-small" href="{{ url_for('admin_school_qr', sid=s.id) }}">QR code</a>
+    <a class="btn btn-outline adm-small" href="{{ url_for('admin_overview', school=s.id) }}">View statistics</a>
+  </p>
+
+  <h3 class="adm-h3">Managers</h3>
+  {% for m in managers.get(s.id, []) %}
+  <div class="adm-row">
+    <div class="adm-row-head"><span class="adm-contact">{{ m.username }}</span>{% if not m.active %}<span class="adm-muted">cannot sign in</span>{% endif %}</div>
+    <div class="adm-actions">
+      <details class="adm-confirm"><summary class="adm-link">Set new password</summary>
+        <form method="post" action="{{ url_for('admin_manager_password', mid=m.id) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label class="adm-label" for="pw{{ m.id }}">New password (at least {{ min_password }} characters)</label>
+          <input class="adm-input" id="pw{{ m.id }}" name="password" type="password" minlength="{{ min_password }}" autocomplete="new-password" required>
+          <button class="btn btn-solid adm-small" type="submit">Save password</button>
+        </form></details>
+      <form method="post" action="{{ url_for('admin_manager_toggle', mid=m.id) }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-outline adm-small" type="submit">{{ 'Stop sign-in' if m.active else 'Allow sign-in' }}</button>
+      </form>
+      <details class="adm-confirm"><summary class="adm-danger-link">Delete</summary>
+        <form method="post" action="{{ url_for('admin_manager_delete', mid=m.id) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="btn adm-small adm-btn-danger" type="submit">Yes, delete {{ m.username }}</button>
+        </form></details>
+    </div>
+  </div>
+  {% else %}<p class="adm-muted">No manager yet.</p>{% endfor %}
+
+  <details class="adm-confirm"><summary class="adm-link">Add a manager</summary>
+    <form method="post" action="{{ url_for('admin_manager_add', sid=s.id) }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="adm-label" for="mu{{ s.id }}">Username</label>
+      <input class="adm-input" id="mu{{ s.id }}" name="username" type="text" maxlength="60" autocomplete="off" autocapitalize="none" required>
+      <label class="adm-label" for="mp{{ s.id }}">Password (at least {{ min_password }} characters; tell them privately)</label>
+      <input class="adm-input" id="mp{{ s.id }}" name="password" type="password" minlength="{{ min_password }}" autocomplete="new-password" required>
+      <button class="btn btn-solid adm-small" type="submit">Add manager</button>
+    </form></details>
+
+  <div class="adm-actions">
+    <details class="adm-confirm"><summary class="adm-link">Rename school</summary>
+      <form method="post" action="{{ url_for('admin_school_rename', sid=s.id) }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label class="adm-label" for="rn{{ s.id }}">School name</label>
+        <input class="adm-input" id="rn{{ s.id }}" name="name" type="text" maxlength="60" value="{{ s.name }}" required>
+        <button class="btn btn-solid adm-small" type="submit">Save name</button>
+      </form></details>
+    <form method="post" action="{{ url_for('admin_school_toggle', sid=s.id) }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn btn-outline adm-small" type="submit">{{ 'Switch off QR code' if s.active else 'Switch on' }}</button>
+    </form>
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

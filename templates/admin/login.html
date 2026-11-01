@@ -17,8 +17,10 @@
       <p class="adm-muted">Mapenzi ya 30 dashboard. Students never see this page.</p>
       {% if error %}<p class="adm-flash is-error" role="alert">{{ error }}</p>{% endif %}
       <form method="post" action="{{ url_for('admin_login') }}">
+        <label class="adm-label" for="username">Username</label>
+        <input class="adm-input" id="username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="60" autofocus>
         <label class="adm-label" for="password">Password</label>
-        <input class="adm-input" id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+        <input class="adm-input" id="password" name="password" type="password" autocomplete="current-password" required>
         <button class="btn btn-solid btn-block" type="submit">Sign in</button>
       </form>
     </div>

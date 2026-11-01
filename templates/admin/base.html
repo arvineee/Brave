@@ -15,7 +15,7 @@
     <div class="adm-wrap adm-bar">
       <a class="adm-brand" href="{{ url_for('admin_overview') }}">
         <span class="adm-logo">{% include "_logo.html" %}</span>
-        <span class="adm-sub">Admin</span>
+        <span class="adm-sub">{{ me.school.name if me.role == 'manager' else 'Admin' }}</span>
       </a>
       <a class="btn btn-light" href="{{ url_for('checkin') }}">view site</a>
       <form method="post" action="{{ url_for('admin_logout') }}">
@@ -24,15 +24,16 @@
       </form>
     </div>
     <nav class="adm-wrap adm-tabs" aria-label="Admin">
-      {% for key, label, endpoint in [
-        ('overview', 'Overview', 'admin_overview'),
-        ('responses', 'Responses', 'admin_responses'),
-        ('support', 'Support requests', 'admin_support'),
-        ('report', 'Report', 'admin_report'),
-        ('questions', 'Questions', 'admin_questions'),
-        ('qr', 'QR code', 'admin_qr'),
-        ('contacts', 'Contacts &amp; socials', 'admin_contacts')] %}
-      <a href="{{ url_for(endpoint) }}"{% if active == key %} class="on" aria-current="page"{% endif %}>{{ label|safe }}</a>
+      {% for key, label, endpoint, only_admin in [
+        ('overview', 'Overview', 'admin_overview', false),
+        ('responses', 'Responses', 'admin_responses', false),
+        ('support', 'Support requests', 'admin_support', false),
+        ('report', 'Report', 'admin_report', false),
+        ('schools', 'Schools', 'admin_schools', true),
+        ('questions', 'Questions', 'admin_questions', true),
+        ('qr', 'QR code' if me.role == 'manager' else 'QR codes', 'admin_qr', false),
+        ('contacts', 'Contacts &amp; socials', 'admin_contacts', true)] if not only_admin or me.role == 'admin' %}
+      <a href="{{ url_for(endpoint, **(sargs if endpoint in ('admin_overview', 'admin_responses', 'admin_support', 'admin_report') else {})) }}"{% if active == key %} class="on" aria-current="page"{% endif %}>{{ label|safe }}</a>
       {% endfor %}
     </nav>
   </header>

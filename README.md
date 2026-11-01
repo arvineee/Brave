@@ -1,6 +1,6 @@
 # Mapenzi ya 30: #IAMBRAVE wellness check-in (Flask)
 
-Pages: `/` home, `/checkin` the 10-question form, `/response?score=1..5` personalised
+Pages: `/` home, `/checkin` the 10-question form, `/s/<school>` the same form for one school, `/response?score=1..5` personalised
 response (missing/invalid score shows 3). Crisis resources (Befrienders Kenya
 0722 178 177, campus counsellor prompt) are in the page on every route.
 Mobile-first, designed from 360px; no cookies, no tracking, no external requests.
@@ -15,12 +15,15 @@ Mobile-first, designed from 360px; no cookies, no tracking, no external requests
 Tables are created automatically on first start (`postgres://` URLs are accepted too).
 
 ## Data (what is stored)
-* `checkins`: anonymous. Date, Kenya-time hour of day (0-23), score, multiple-choice answers.
-  No name, contact, IP, user agent, exact time or free text.
+* `checkins`: anonymous. Date, Kenya-time hour of day (0-23), score, multiple-choice answers, and
+  which school's QR code was scanned. No name, contact, IP, user agent, exact time or free text.
 * `custom_answers`: answers to extra questions staff added in the dashboard (multiple choice
   only, tied to the anonymous check-in, never to a person).
 * `support_requests`: only if the student typed a contact AND ticked consent. Contact,
-  support type, channel, date, and a "contacted" flag set by staff. Not linked to any check-in.
+  support type, channel, date, school, and a "contacted" flag set by staff. Not linked to any
+  check-in.
+* `schools`, `managers`: each school's name and QR address, and the school managers' logins
+  (username and password hash only).
 * `site_settings`, `custom_questions`: staff-edited wording, helpline, contacts, social links
   and extra questions (no student data).
 * The two reflection boxes (questions 5 and 6) are only used on the phone to catch
@@ -30,6 +33,34 @@ Staff dashboard: see "Admin dashboard" below. Command-line reports (run on the s
     python admin.py stats
     python admin.py requests
     python admin.py purge --days 30     # delete old support requests
+
+## Schools and school managers
+One site can serve many schools. Each school has its own check-in address `/s/<slug>`, shown to
+students as "Checking in for <school name>", and its own QR code with the name printed under it.
+Check-ins from the old general link (`/checkin`) are kept and shown as "Unassigned"; nothing
+is lost on upgrade (the `school_id` columns are added on first start).
+
+Who sees what
+* **Administrator** (the `ADMIN_PASSWORD_HASH` password): every school together, or one school or
+  "Unassigned" through the school picker on Overview, Responses, Support requests and Report. The
+  overview also has a school-by-school table. Only the administrator can change questions,
+  contacts and social links, schools and managers.
+* **School manager**: Overview, Responses (and CSV), Support requests, Report and their own QR
+  code, all limited to their school. Every query is filtered on the server, so changing the
+  address (`?school=...`) cannot show another school.
+
+One sign-in page for both (`/admin`, fields: username and password). Nothing on it says which kind
+of account it is for. The administrator signs in with username `admin` (or leaves it empty) and
+the `ADMIN_PASSWORD_HASH` password; managers use the username and password the administrator gave
+them. `admin` cannot be used as a manager username.
+
+To add a school: Admin, **Schools**, "Add a school", then "Add a manager" under it (password at
+least 10 characters, give it to them privately). "Set new password" signs that manager out
+everywhere; "Stop sign-in" blocks them at once. The school's address (and so its printed QR code)
+never changes when you rename the school; download the QR code again to print the new name.
+Switching a school off makes its QR code show "page not found" but keeps its data and managers.
+Print each school's QR code from **QR codes**. School codes use the same site address as the
+general code.
 
 ## Admin dashboard (`/admin`)
 Switched off until both variables are set in the server environment (PythonAnywhere: the WSGI
@@ -56,7 +87,7 @@ What staff can do
 * **Report**: pick a period (From / To) and get a printable summary: check-ins by level, average
   level, crisis count, time of day and day of week, and support-request counts. Print or save as
   PDF with the button, or download a CSV. Names and contact details are never in a report.
-* **QR code**: type the check-in address once (e.g. `https://mapenzi.example.org/checkin`). The
+* **QR codes**: one per school (see above), plus the general code. For the general one, type the check-in address once (e.g. `https://mapenzi.example.org/checkin`). The
   QR code is drawn from that saved address every time the page loads, so when the site moves,
   change the address and the code follows. Download it as SVG (sharp at any size, for posters)
   or print the page. Until an address is saved, the code uses the address the site is reached at.

@@ -4,6 +4,7 @@ Pages
   /          home
   /checkin   the 10-question check-in (scored in the browser, see static/)
   /response  the personalised response, /response?score=1..5 (default 3)
+  /s/<slug>  the check-in for one school (the QR code of that school opens this page)
   POST /api/checkin   stores the anonymous result (and an opt-in support request)
 
   /admin/*  staff dashboard (see dashboard.py); off unless ADMIN_PASSWORD_HASH and
@@ -11,7 +12,8 @@ Pages
 
 Storage (Flask-SQLAlchemy): DATABASE_URL, e.g. postgresql://user:pass@host/db.
 Without it a local SQLite file is used for development. Two separate tables:
-`checkins` is anonymous (day, score, multiple-choice answers); `support_requests`
+`checkins` is anonymous (day, score, multiple-choice answers, and which school's QR code was
+scanned); `support_requests`
 holds a contact only when the student typed one AND ticked consent, with no link
 to any check-in. Free-text reflections are never sent or stored. Public pages set no
 cookies, no sessions, no analytics. The only cookie is the staff login cookie, which is
@@ -23,7 +25,7 @@ import secrets
 import time
 from datetime import datetime, timedelta, timezone
 
-from flask import Flask, g, jsonify, redirect, render_template, request, url_for
+from flask import Flask, abort, g, jsonify, redirect, render_template, request, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -41,8 +43,29 @@ db = SQLAlchemy()
 log = logging.getLogger("mapenzi")
 
 
+class School(db.Model):
+    """A school that uses the site. Its QR code opens /s/<slug>. The slug is fixed once created
+    because it is printed in the QR code; the name can be corrected at any time."""
+    __tablename__ = "schools"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    slug = db.Column(db.String(40), nullable=False, unique=True)
+    active = db.Column(db.Integer, nullable=False, default=1, server_default="1")
+
+
+class Manager(db.Model):
+    """A school manager's login. Sees only the statistics of their own school."""
+    __tablename__ = "managers"
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(60), nullable=False, unique=True)   # stored lower-case
+    password_hash = db.Column(db.String(300), nullable=False)
+    school_id = db.Column(db.Integer, db.ForeignKey("schools.id"), nullable=False, index=True)
+    active = db.Column(db.Integer, nullable=False, default=1, server_default="1")
+
+
 class Checkin(db.Model):
-    """Anonymous: no name, contact, IP, user agent or free text."""
+    """Anonymous: no name, contact, IP, user agent or free text. `school_id` is only the school
+    whose QR code was scanned (NULL = the general link, shown as "Unassigned")."""
     __tablename__ = "checkins"
     id = db.Column(db.Integer, primary_key=True)
     day = db.Column(db.String(10), nullable=False, index=True)
@@ -55,6 +78,7 @@ class Checkin(db.Model):
     support_type = db.Column(db.String(80))
     channel = db.Column(db.String(20))
     hour = db.Column(db.Integer)  # Kenya-time hour 0-23, so staff can see when students check in
+    school_id = db.Column(db.Integer, db.ForeignKey("schools.id"), index=True)
     __table_args__ = (
         db.CheckConstraint("score BETWEEN 1 AND 5", name="ck_score"),
         db.CheckConstraint("connection BETWEEN 0 AND 10", name="ck_connection"),
@@ -70,6 +94,7 @@ class SupportRequest(db.Model):
     channel = db.Column(db.String(20), nullable=False)
     contact = db.Column(db.String(120), nullable=False)
     handled = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    school_id = db.Column(db.Integer, db.ForeignKey("schools.id"), index=True)
 
 
 class SiteSetting(db.Model):
@@ -134,8 +159,9 @@ def install_triggers():
 def ensure_columns():
     """create_all() adds new tables but not new columns on existing ones. Add them here so the
     live database upgrades itself on the first start of this version."""
-    wanted = {"checkins": (("hour", "INTEGER"),),
-              "support_requests": (("handled", "INTEGER NOT NULL DEFAULT 0"),)}
+    wanted = {"checkins": (("hour", "INTEGER"), ("school_id", "INTEGER")),
+              "support_requests": (("handled", "INTEGER NOT NULL DEFAULT 0"),
+                                   ("school_id", "INTEGER"))}
     have = inspect(db.engine)
     for table, cols in wanted.items():
         existing = {c["name"] for c in have.get_columns(table)}
@@ -148,6 +174,14 @@ def ensure_columns():
             except SQLAlchemyError:
                 db.session.rollback()  # another worker may have added it a moment ago
                 log.warning("could not add %s.%s", table, name, exc_info=True)
+    for table in ("checkins", "support_requests"):  # speeds up the per-school dashboards
+        try:
+            db.session.execute(text(f"CREATE INDEX IF NOT EXISTS ix_{table}_school_id "
+                                    f"ON {table} (school_id)"))
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            log.warning("could not index %s.school_id", table, exc_info=True)
 
 
 def start_trial(secret):
@@ -351,7 +385,7 @@ def create_app(config=None):
         return render_template("locked.html", crisis=get_config()["crisis"], site=SITE,
                                L=LOCKED, error=LOCKED["wrong_key"]), 403
 
-    NOINDEX_ENDPOINTS = {"response", "locked", "unlock", "api_checkin"}
+    NOINDEX_ENDPOINTS = {"response", "locked", "unlock", "api_checkin", "school_checkin"}
 
     @app.context_processor
     def footer_context():
@@ -398,19 +432,41 @@ def create_app(config=None):
     def home():
         return render_template("home.html", site=SITE, crisis=get_config()["crisis"])
 
-    @app.route("/checkin")
-    def checkin():
+    def active_school(slug):
+        """The active school for this slug, or None."""
+        if not isinstance(slug, str) or not 1 <= len(slug) <= 40:
+            return None
+        try:
+            return School.query.filter_by(slug=slug, active=1).first()
+        except SQLAlchemyError:
+            db.session.rollback()
+            log.warning("school lookup failed", exc_info=True)
+            return None
+
+    def render_checkin(school):
         cfg = get_config()
         return render_template("checkin.html", f=cfg["form"], p=cfg["prompts"],
                                custom=cfg["custom"], crisis=cfg["crisis"], site=SITE,
-                               wants_support=list(WANTS_SUPPORT))
+                               wants_support=list(WANTS_SUPPORT), school=school)
+
+    @app.route("/checkin")
+    def checkin():
+        return render_checkin(None)
+
+    @app.route("/s/<slug>")
+    def school_checkin(slug):
+        school = active_school(slug)
+        if school is None:
+            abort(404)
+        return render_checkin(school)
 
     @app.route("/response")
     def response():
         score = parse_score(request.args.get("score"))
+        school = active_school(request.args.get("school"))   # only used to link back to its page
         return render_template(
             "response.html", score=score, r=RESPONSES[score], crisis=get_config()["crisis"],
-            site=SITE, is_crisis=(score == 5),
+            site=SITE, is_crisis=(score == 5), school=school,
         )
 
     @app.post("/api/checkin")
@@ -424,6 +480,12 @@ def create_app(config=None):
         answers = siteconfig.clean_custom_answers(body.get("custom"), cfg["custom"])
         if answers is None:
             return jsonify(error="invalid"), 400
+        school_id = None
+        if body.get("school") is not None:   # absent = the general link (Unassigned)
+            school = active_school(body.get("school"))
+            if school is None:
+                return jsonify(error="invalid"), 400
+            school_id = school.id
         now = datetime.now(EAT)
         day = now.date().isoformat()
         try:
@@ -431,7 +493,7 @@ def create_app(config=None):
                 day=day, hour=now.hour, score=c["score"], energy=c["energy"], sleep=c["sleep"],
                 connection=c["connection"], kept_up="; ".join(c["kept_up"]),
                 support_now=c["support_now"], support_type=c["support_type"],
-                channel=c["channel"],
+                channel=c["channel"], school_id=school_id,
             )
             db.session.add(row)
             db.session.flush()  # gives `row` its id for the extra answers
@@ -440,7 +502,7 @@ def create_app(config=None):
             if req:
                 db.session.add(SupportRequest(
                     day=day, support_type=c["support_type"], channel=c["channel"],
-                    contact=req["contact"],
+                    contact=req["contact"], school_id=school_id,
                 ))
             db.session.commit()
         except SQLAlchemyError:
@@ -473,8 +535,8 @@ def create_app(config=None):
 
     dashboard.register(app, dashboard.Deps(
         db=db, Checkin=Checkin, SupportRequest=SupportRequest, SiteSetting=SiteSetting,
-        CustomQuestion=CustomQuestion, CustomAnswer=CustomAnswer, get_config=get_config,
-        eat=EAT))
+        CustomQuestion=CustomQuestion, CustomAnswer=CustomAnswer, School=School,
+        Manager=Manager, get_config=get_config, eat=EAT))
 
     return app
 

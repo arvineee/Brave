@@ -3,8 +3,10 @@
 {% block content %}
 <div class="adm-noprint">
   <h1 class="adm-h1">Report</h1>
+  {% include "admin/_scope_bar.html" %}
   <p class="adm-muted">Choose a period to get a summary you can print, save as PDF or download as CSV. Counts are check-in <em>submissions</em>, not students. Nothing in the report names a student or shows contact details.</p>
   <form method="get" action="{{ url_for('admin_report') }}" class="adm-report-form">
+    {% if sargs.school %}<input type="hidden" name="school" value="{{ sargs.school }}">{% endif %}
     <label class="adm-label" for="rf">From</label>
     <input class="adm-input" id="rf" type="date" name="from" value="{{ p.start.isoformat() }}" required>
     <label class="adm-label" for="rt">To</label>
@@ -19,6 +21,7 @@
 
 <article class="adm-report" aria-label="Report">
   <h2 class="adm-h2">Mapenzi ya 30 check-in report</h2>
+  <p><strong>{{ scope.label }}</strong></p>
   <p class="adm-muted">Period: {{ p.start.strftime('%d %b %Y') }} to {{ p.end.strftime('%d %b %Y') }}. Prepared {{ p.today.strftime('%d %b %Y') }}. Kenya time.</p>
 
   {% if r.total == 0 %}

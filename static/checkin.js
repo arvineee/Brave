@@ -106,7 +106,10 @@
     btn.disabled = true;
     btn.textContent = "Preparing your response…";
 
-    var url = form.getAttribute("data-response-url") + "?score=" + score;
+    var school = form.getAttribute("data-school");
+    if (school) payload.school = school;
+    var url = form.getAttribute("data-response-url") + "?score=" + score +
+      (school ? "&school=" + encodeURIComponent(school) : "");
     var gone = false;
     function go() { if (!gone) { gone = true; window.location.assign(url); } }
     try {

@@ -8,6 +8,7 @@
 {% block content %}
 {% set h = data.headline %}{% set b = data.breakdown %}{% set t = data.trend %}{% set c = data.crisis %}{% set p = data.patterns %}
 <h1 class="adm-h1">Overview</h1>
+{% include "admin/_scope_bar.html" %}
 <p class="adm-muted">Counts are check-in <em>submissions</em>, not students: check-ins are anonymous, so one student who checks in twice counts twice. Dates are Kenya time. Weeks run Monday to Sunday.</p>
 
 {% if h.all == 0 %}
@@ -22,6 +23,21 @@
   <div class="adm-stat"><p class="adm-stat-label">All time</p><p class="adm-stat-num">{{ h.all }}</p><p class="adm-stat-sub adm-muted">{{ h.last_month_full }} last month</p></div>
 </section>
 
+{% if by_school %}
+<section class="adm-card" aria-labelledby="bs-h">
+  <h2 class="adm-h2" id="bs-h">By school</h2>
+  <div class="adm-table-wrap"><table class="adm-table">
+    <thead><tr><th scope="col">School</th><th scope="col" class="num">This month</th><th scope="col" class="num">In crisis this month</th><th scope="col" class="num">All time</th></tr></thead>
+    <tbody>
+    {% for r in by_school %}
+    <tr><th scope="row"><a href="{{ url_for('admin_overview', school=(r.id if r.id else 'none')) }}">{{ r.name }}</a></th>
+      <td class="num">{{ r.month }}</td><td class="num">{{ r.crisis }}</td><td class="num">{{ r.all }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endif %}
+
 {% if data.insights %}
 <section class="adm-card adm-insights" aria-labelledby="ins-h">
   <h2 class="adm-h2" id="ins-h">What stands out</h2>
@@ -32,7 +48,7 @@
 <nav class="adm-range" aria-label="Range for the breakdown and time patterns">
   <span class="adm-muted">Showing:</span>
   {% for key, label in ranges.items() %}
-  <a href="{{ url_for('admin_overview', range=key) }}"{% if b.range == key %} class="on" aria-current="true"{% endif %}>{{ label }}</a>
+  <a href="{{ url_for('admin_overview', range=key, **sargs) }}"{% if b.range == key %} class="on" aria-current="true"{% endif %}>{{ label }}</a>
   {% endfor %}
 </nav>
 
