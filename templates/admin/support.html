@@ -3,11 +3,49 @@
 {% block content %}
 <h1 class="adm-h1">Support requests</h1>
 {% include "admin/_scope_bar.html" %}
+{% if me.role == 'admin' %}
+<section class="adm-card" aria-labelledby="rv-h">
+  <h2 class="adm-h2" id="rv-h">Review before school managers see them ({{ pending|length }})</h2>
+  <p class="adm-muted">New requests stay with you. Check them, delete any that should not go on, then push them to the school's manager. A manager sees nothing until you push it.</p>
+  {% if not pending %}<p>Nothing waiting for review.</p>{% else %}
+  <form method="post" action="{{ url_for('admin_support_release', **sargs) }}" id="rv-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <ul class="adm-rows">
+    {% for r in pending %}
+    <li class="adm-row">
+      <label class="adm-row-head">
+        <span><input type="checkbox" name="ids" value="{{ r.id }}"{% if not r.school_id %} disabled{% endif %}> <span class="adm-contact">{{ r.contact }}</span></span>
+        <span class="adm-muted">{{ r.day }} &middot; {{ names.get(r.school_id, 'Unassigned') }}</span>
+      </label>
+      <p class="adm-muted">Prefers <strong>{{ r.channel }}</strong> &middot; wants {{ r.support_type }}{% if not r.school_id %} &middot; general link: no manager to send it to{% endif %}</p>
+      <div class="adm-actions">
+        <button class="btn btn-solid adm-small" type="submit" formaction="{{ url_for('admin_support_release_one', rid=r.id, **sargs) }}"{% if not r.school_id %} disabled{% endif %}>Push to manager</button>
+      </div>
+    </li>
+    {% endfor %}
+    </ul>
+    <div class="adm-actions">
+      <button class="btn btn-solid adm-small" type="submit">Push ticked</button>
+      <button class="btn btn-outline adm-small" type="submit" name="all" value="1">Push all waiting{% if scope.kind != 'all' %} ({{ scope.label }}){% endif %}</button>
+    </div>
+  </form>
+  {% for r in pending %}
+  <details class="adm-confirm"><summary class="adm-danger-link">Delete {{ r.contact }} instead of pushing</summary>
+    <form method="post" action="{{ url_for('admin_support_delete', rid=r.id, **sargs) }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn adm-small adm-btn-danger" type="submit">Yes, delete this request</button>
+    </form></details>
+  {% endfor %}
+  {% endif %}
+</section>
+<h2 class="adm-h2">Pushed to managers</h2>
+{% endif %}
+
 <p class="adm-note">Students who asked to be contacted and ticked consent. This is the only place personal contact details are stored, and they are kept apart from check-in answers. Delete a request once you have followed up.</p>
 
 <p class="adm-muted"><strong>{{ waiting }}</strong> waiting &middot; {{ rows|length }} total</p>
 
-{% if not rows %}<section class="adm-card"><p>No support requests yet.</p></section>{% endif %}
+{% if not rows %}<section class="adm-card"><p>No support requests {{ 'pushed to managers' if me.role == 'admin' else 'yet' }}.</p></section>{% endif %}
 
 <ul class="adm-rows">
 {% for r in rows %}
@@ -18,6 +56,12 @@
   </div>
   <p class="adm-muted">Prefers <strong>{{ r.channel }}</strong> &middot; wants {{ r.support_type }}</p>
   <div class="adm-actions">
+    {% if me.role == 'admin' %}
+    <form method="post" action="{{ url_for('admin_support_withdraw', rid=r.id, **sargs) }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn btn-outline adm-small" type="submit">Take back from manager</button>
+    </form>
+    {% endif %}
     <form method="post" action="{{ url_for('admin_support_handled', rid=r.id, **sargs) }}">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <button class="btn btn-outline adm-small" type="submit">{{ 'Mark as waiting' if r.handled else 'Mark as contacted' }}</button>

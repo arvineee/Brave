@@ -497,17 +497,67 @@ def register(app, d):
     def own_request(rid):
         """A support request this person may touch: managers only their own school's."""
         r = db.session.get(d.SupportRequest, rid)
-        if r is None or (g.staff["role"] == "manager" and r.school_id != g.staff["school_id"]):
+        if r is None or (g.staff["role"] == "manager"
+                         and (r.school_id != g.staff["school_id"] or not r.released)):
             abort(404)
         return r
 
     @app.get("/admin/support")
     @staff_only
     def admin_support():
-        rows = (d.SupportRequest.query.filter(sfilter(d.SupportRequest.school_id))
-                .order_by(d.SupportRequest.handled, d.SupportRequest.id.desc()).all())
-        return page("support.html", "support", rows=rows, names=school_names(),
-                    waiting=sum(1 for r in rows if not r.handled))
+        q = d.SupportRequest.query.filter(sfilter(d.SupportRequest.school_id))
+        if g.staff["role"] == "manager":   # a manager only sees what the administrator released
+            q = q.filter(d.SupportRequest.released == 1)
+        rows = q.order_by(d.SupportRequest.handled, d.SupportRequest.id.desc()).all()
+        pending = [r for r in rows if not r.released]
+        released = [r for r in rows if r.released]
+        return page("support.html", "support", rows=released, pending=pending,
+                    names=school_names(), waiting=sum(1 for r in released if not r.handled))
+
+    def release_ids(ids, value):
+        """Set `released` on the given requests that have a school (the administrator's review).
+        Returns how many changed. Requests from the general link have no manager to receive them."""
+        q = d.SupportRequest.query.filter(d.SupportRequest.id.in_(ids),
+                                          d.SupportRequest.school_id.isnot(None),
+                                          d.SupportRequest.released != value)
+        n = q.count()
+        save(lambda: q.update({"released": value}, synchronize_session=False),
+             (f"Pushed {n} request(s) to the school manager(s)." if value
+              else f"Took back {n} request(s) from the school manager(s)."))
+        return n
+
+    @app.post("/admin/support/release")
+    @admin_only
+    def admin_support_release():
+        """Bulk: the ticked requests, or every waiting request in the current school scope."""
+        if request.form.get("all"):
+            ids = [r_id for (r_id,) in db.session.query(d.SupportRequest.id).filter(
+                sfilter(d.SupportRequest.school_id), d.SupportRequest.released == 0)]
+        else:
+            ids = [int(x) for x in request.form.getlist("ids") if x.isdigit()]
+        if not ids:
+            flash("Tick at least one request first.", "error")
+        else:
+            release_ids(ids, 1)
+        return redirect(url_for("admin_support", **sargs()))
+
+    @app.post("/admin/support/<int:rid>/release")
+    @admin_only
+    def admin_support_release_one(rid):
+        r = own_request(rid)
+        if r.school_id is None:
+            flash("This request came from the general link, so there is no school manager to "
+                  "send it to.", "error")
+        else:
+            release_ids([r.id], 1)
+        return redirect(url_for("admin_support", **sargs()))
+
+    @app.post("/admin/support/<int:rid>/withdraw")
+    @admin_only
+    def admin_support_withdraw(rid):
+        r = own_request(rid)
+        release_ids([r.id], 0)
+        return redirect(url_for("admin_support", **sargs()))
 
     @app.post("/admin/support/<int:rid>/handled")
     @staff_only
@@ -531,6 +581,8 @@ def register(app, d):
     def admin_support_purge():
         q = d.SupportRequest.query.filter(d.SupportRequest.handled == 1,
                                           sfilter(d.SupportRequest.school_id))
+        if g.staff["role"] == "manager":
+            q = q.filter(d.SupportRequest.released == 1)
         n = q.count()
         save(lambda: q.delete(synchronize_session=False), f"Deleted {n} handled request(s).")
         return redirect(url_for("admin_support", **sargs()))
@@ -785,7 +837,10 @@ def register(app, d):
         for m in d.Manager.query.order_by(d.Manager.username):
             managers.setdefault(m.school_id, []).append(m)
         schools = d.School.query.order_by(d.School.name).all()
+        contact_counts = dict(db.session.query(d.SupportRequest.school_id, func.count())
+                              .group_by(d.SupportRequest.school_id).all())
         return page("schools.html", "schools", schools=schools, counts=counts,
+                    contact_counts=contact_counts,
                     managers=managers, min_password=MIN_PASSWORD,
                     urls={s_.id: school_address(s_) for s_ in schools})
 
@@ -829,6 +884,38 @@ def register(app, d):
             school.active = 0 if school.active else 1
         save(change, "School switched off. Its QR code stops working, but its data and its "
              "managers are kept." if school.active else "School switched on.")
+        return redirect(url_for("admin_schools"))
+
+    @app.post("/admin/schools/<int:sid>/delete")
+    @admin_only
+    def admin_school_delete(sid):
+        """Remove a school that is no longer needed. The administrator must type its name.
+        Always deleted with it: its managers and its contacts (personal data that is no longer
+        needed). Its anonymous check-ins are kept as "Unassigned" unless the box is ticked."""
+        school = school_or_404(sid)
+        if " ".join((request.form.get("confirm") or "").split()).lower() != school.name.lower():
+            flash("The name you typed does not match, so nothing was deleted.", "error")
+            return redirect(url_for("admin_schools"))
+        drop_checkins = bool(request.form.get("drop_checkins"))
+        name = school.name
+
+        def change():
+            d.SupportRequest.query.filter_by(school_id=sid).delete(synchronize_session=False)
+            d.Manager.query.filter_by(school_id=sid).delete(synchronize_session=False)
+            checkins = d.Checkin.query.filter_by(school_id=sid)
+            if drop_checkins:
+                ids = [i for (i,) in db.session.query(d.Checkin.id).filter_by(school_id=sid)]
+                for i in range(0, len(ids), 500):
+                    d.CustomAnswer.query.filter(d.CustomAnswer.checkin_id.in_(ids[i:i + 500])
+                                                ).delete(synchronize_session=False)
+                checkins.delete(synchronize_session=False)
+            else:
+                checkins.update({"school_id": None}, synchronize_session=False)
+            db.session.delete(school)
+
+        save(change, f"{name} deleted with its managers and contacts. " + (
+            "Its check-ins were deleted too." if drop_checkins
+            else "Its anonymous check-ins are kept under Unassigned."))
         return redirect(url_for("admin_schools"))
 
     @app.post("/admin/schools/<int:sid>/managers")
@@ -907,9 +994,12 @@ def register(app, d):
                 .filter(d.Checkin.day >= lo, d.Checkin.day <= hi,
                         sfilter(d.Checkin.school_id)).all())
         summary = stats.report(rows)
-        sup = d.SupportRequest.query.filter(d.SupportRequest.day >= lo,
-                                            d.SupportRequest.day <= hi,
-                                            sfilter(d.SupportRequest.school_id)).all()
+        sq = d.SupportRequest.query.filter(d.SupportRequest.day >= lo,
+                                           d.SupportRequest.day <= hi,
+                                           sfilter(d.SupportRequest.school_id))
+        if g.staff["role"] == "manager":
+            sq = sq.filter(d.SupportRequest.released == 1)
+        sup = sq.all()
         # Counts only: no contact details ever go into a report.
         summary["support"] = {
             "total": len(sup),

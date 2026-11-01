@@ -53,9 +53,9 @@ def world(app):
                 db.session.add(Checkin(school_id=sid, score=score, **base))
         db.session.add_all([
             SupportRequest(day="2026-10-20", support_type="Counselling", channel="Phone",
-                           contact="0711-KAGUMO", school_id=a.id),
+                           contact="0711-KAGUMO", school_id=a.id, released=1),
             SupportRequest(day="2026-10-20", support_type="Counselling", channel="Phone",
-                           contact="0722-MARYS", school_id=b.id)])
+                           contact="0722-MARYS", school_id=b.id, released=1)])
         db.session.commit()
         return {"a": a.id, "b": b.id}
 
@@ -391,3 +391,172 @@ def test_slug_is_ascii_and_unique():
     assert make_slug("Kagumo High School", {"kagumo-high-school"}) == "kagumo-high-school-2"
     assert make_slug("Ñandú  Sch.", set()) == "nandu-sch"
     assert make_slug("(((", set()) == "school"
+
+
+# ------------------------------------------------- review before release ----
+def _new_request(app, school_slug, contact):
+    body = valid(support_now="Yes", support_type="Personal therapy.", channel="SMS",
+                 request={"contact": contact, "consent": True})
+    if school_slug:
+        body["school"] = school_slug
+    assert app.test_client().post("/api/checkin", json=body).status_code == 204
+    with app.app_context():
+        return SupportRequest.query.filter_by(contact=contact).one().id
+
+
+def test_new_contact_waits_for_the_administrator(app, world):
+    rid = _new_request(app, "kagumo-high", "0799-NEW")
+    with app.app_context():
+        assert db.session.get(SupportRequest, rid).released == 0
+    mgr = sign_in(app, "kagumo", MGR_PW)
+    assert "0799-NEW" not in mgr.get("/admin/support").get_data(as_text=True)
+    assert post(mgr, f"/admin/support/{rid}/handled").status_code == 404
+    assert post(mgr, f"/admin/support/{rid}/delete").status_code == 404
+    assert post(mgr, f"/admin/support/{rid}/release").status_code == 403
+    assert post(mgr, "/admin/support/release", all="1").status_code == 403
+    admin = sign_in(app, "admin", PASSWORD)
+    html = admin.get("/admin/support").get_data(as_text=True)
+    assert "0799-NEW" in html and "Push to manager" in html
+
+
+def test_push_one_then_take_back(app, world):
+    rid = _new_request(app, "kagumo-high", "0799-ONE")
+    admin, mgr = sign_in(app, "admin", PASSWORD), sign_in(app, "kagumo", MGR_PW)
+    assert post(admin, f"/admin/support/{rid}/release").status_code == 302
+    assert "0799-ONE" in mgr.get("/admin/support").get_data(as_text=True)
+    post(admin, f"/admin/support/{rid}/withdraw")
+    assert "0799-ONE" not in mgr.get("/admin/support").get_data(as_text=True)
+
+
+def test_bulk_push_ticked_and_push_all(app, world):
+    a1 = _new_request(app, "kagumo-high", "0799-A1")
+    a2 = _new_request(app, "kagumo-high", "0799-A2")
+    b1 = _new_request(app, "st-marys-girls", "0799-B1")
+    admin = sign_in(app, "admin", PASSWORD)
+    assert post(admin, "/admin/support/release").status_code == 302     # nothing ticked
+    with app.app_context():
+        assert SupportRequest.query.filter_by(released=0).count() == 3
+    c = admin.post("/admin/support/release", data={"csrf": admin.csrf, "ids": [a1, "x", str(a2)]})
+    assert c.status_code == 302
+    with app.app_context():
+        assert {r.contact for r in SupportRequest.query.filter_by(released=0)} == {"0799-B1"}
+    post(admin, "/admin/support/release", all="1")
+    with app.app_context():
+        assert SupportRequest.query.filter_by(released=0).count() == 0
+        assert db.session.get(SupportRequest, b1).released == 1
+
+
+def test_push_all_respects_the_school_picker_and_skips_unassigned(app, world):
+    k = _new_request(app, "kagumo-high", "0799-K")
+    m = _new_request(app, "st-marys-girls", "0799-M")
+    u = _new_request(app, None, "0799-U")
+    admin = sign_in(app, "admin", PASSWORD)
+    post(admin, f"/admin/support/release?school={world['a']}", all="1")
+    with app.app_context():
+        assert db.session.get(SupportRequest, k).released == 1
+        assert db.session.get(SupportRequest, m).released == 0
+    post(admin, "/admin/support/release", all="1")
+    with app.app_context():
+        assert db.session.get(SupportRequest, m).released == 1
+        assert db.session.get(SupportRequest, u).released == 0   # no manager to receive it
+    post(admin, f"/admin/support/{u}/release")
+    with app.app_context():
+        assert db.session.get(SupportRequest, u).released == 0
+
+
+def test_manager_report_counts_only_released_contacts(app, world):
+    _new_request(app, "kagumo-high", "0799-HOLD")
+    q = "/admin/report.csv?from=2026-10-01&to=2026-12-31"
+    mgr = sign_in(app, "kagumo", MGR_PW)
+    assert "Support requests,1" in mgr.get(q).get_data(as_text=True)    # only the released one
+
+
+def test_old_requests_stay_visible_to_managers_after_upgrade(tmp_path):
+    path = tmp_path / "old2.db"
+    con = sqlite3.connect(path)
+    con.executescript("""
+        CREATE TABLE support_requests (id INTEGER PRIMARY KEY, day VARCHAR(10) NOT NULL,
+          support_type VARCHAR(80) NOT NULL, channel VARCHAR(20) NOT NULL, contact VARCHAR(120) NOT NULL);
+        INSERT INTO support_requests (day, support_type, channel, contact) VALUES ('2026-10-01', 'Other:', 'SMS', '0700');
+    """)
+    con.commit(); con.close()
+    a = create_app({"TESTING": True, "LICENSE_SECRET": "s", "SQLALCHEMY_DATABASE_URI": f"sqlite:///{path}"})
+    with a.app_context():
+        assert SupportRequest.query.one().released == 1
+
+
+# ------------------------------------------------------- delete a school ----
+def test_delete_school_needs_the_exact_name(app, world):
+    admin = sign_in(app, "admin", PASSWORD)
+    post(admin, f"/admin/schools/{world['a']}/delete", confirm="Wrong name")
+    with app.app_context():
+        assert db.session.get(School, world["a"]) is not None
+    assert post(admin, f"/admin/schools/{world['a']}/delete").status_code == 302
+    with app.app_context():
+        assert db.session.get(School, world["a"]) is not None
+
+
+def test_delete_school_removes_contacts_and_managers_but_keeps_anonymous_stats(app, world):
+    admin = sign_in(app, "admin", PASSWORD)
+    mgr = sign_in(app, "kagumo", MGR_PW)
+    r = post(admin, f"/admin/schools/{world['a']}/delete", confirm=" kagumo  HIGH school ")
+    assert r.status_code == 302
+    with app.app_context():
+        assert db.session.get(School, world["a"]) is None
+        assert Manager.query.filter_by(username="kagumo").count() == 0
+        assert SupportRequest.query.filter_by(contact="0711-KAGUMO").count() == 0
+        assert SupportRequest.query.filter_by(contact="0722-MARYS").count() == 1   # other school safe
+        assert Checkin.query.count() == 7                                           # all kept
+        assert Checkin.query.filter_by(school_id=None).count() == 5                 # 4 + 1 unassigned
+        assert db.session.get(School, world["b"]) is not None
+    assert mgr.get("/admin/support").status_code == 302                              # signed out
+    assert app.test_client().get("/s/kagumo-high").status_code == 404
+    assert app.test_client().post("/admin/login", data={"username": "kagumo",
+                                                        "password": MGR_PW}).status_code != 302
+
+
+def test_delete_school_can_also_delete_its_checkins(app, world):
+    from app import CustomAnswer, CustomQuestion
+    with app.app_context():
+        q = CustomQuestion(prompt="Safe?", kind="choice", options='["Yes","No"]',
+                           required=0, active=1, position=1)
+        db.session.add(q); db.session.flush()
+        mine = Checkin.query.filter_by(school_id=world["a"]).first().id
+        other = Checkin.query.filter_by(school_id=world["b"]).first().id
+        db.session.add_all([CustomAnswer(checkin_id=mine, question_id=q.id, answer="Yes"),
+                            CustomAnswer(checkin_id=other, question_id=q.id, answer="No")])
+        db.session.commit()
+    admin = sign_in(app, "admin", PASSWORD)
+    post(admin, f"/admin/schools/{world['a']}/delete", confirm="Kagumo High School",
+         drop_checkins="1")
+    with app.app_context():
+        assert Checkin.query.count() == 3                  # 2 (St Mary's) + 1 unassigned
+        assert CustomAnswer.query.count() == 1
+
+
+def test_only_the_administrator_can_delete_a_school(app, world):
+    mgr = sign_in(app, "kagumo", MGR_PW)
+    assert post(mgr, f"/admin/schools/{world['a']}/delete",
+                confirm="Kagumo High School").status_code == 403
+    assert post(sign_in(app, "admin", PASSWORD), "/admin/schools/9999/delete").status_code == 404
+
+
+# ------------------------------------------------------- privacy policy ----
+def test_privacy_policy_is_public_and_linked(app):
+    c = app.test_client()
+    r = c.get("/privacy")
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and "Data Protection Act, 2019" in html
+    assert "Article 31" in html and "Article 53(2)" in html and "odpc.go.ke" in html
+    assert "Set-Cookie" not in r.headers
+    assert 'href="/privacy"' in c.get("/checkin").get_data(as_text=True)
+    assert "/privacy" in c.get("/sitemap.xml").get_data(as_text=True)
+
+
+def test_privacy_policy_shows_registration_only_when_configured(app, monkeypatch):
+    c = app.test_client()
+    assert "registration number" not in c.get("/privacy").get_data(as_text=True)
+    monkeypatch.setenv("ODPC_REG_NO", "REG-12345")
+    monkeypatch.setenv("DPO_EMAIL", "dpo@example.org")
+    html = c.get("/privacy").get_data(as_text=True)
+    assert "REG-12345" in html and "dpo@example.org" in html

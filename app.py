@@ -4,6 +4,7 @@ Pages
   /          home
   /checkin   the 10-question check-in (scored in the browser, see static/)
   /response  the personalised response, /response?score=1..5 (default 3)
+  /privacy   privacy policy (Data Protection Act, 2019)
   /s/<slug>  the check-in for one school (the QR code of that school opens this page)
   POST /api/checkin   stores the anonymous result (and an opt-in support request)
 
@@ -38,6 +39,7 @@ from content import CRISIS, DEFAULT_SCORE, FORM, LOCKED, RESPONSES, SITE, WANTS_
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EAT = timezone(timedelta(hours=3))  # Kenya time
+PRIVACY_UPDATED = "1 November 2026"   # change when templates/privacy.html changes
 
 db = SQLAlchemy()
 log = logging.getLogger("mapenzi")
@@ -95,6 +97,9 @@ class SupportRequest(db.Model):
     contact = db.Column(db.String(120), nullable=False)
     handled = db.Column(db.Integer, nullable=False, default=0, server_default="0")
     school_id = db.Column(db.Integer, db.ForeignKey("schools.id"), index=True)
+    # 0 = waiting for the administrator's review; 1 = pushed to the school manager. A manager
+    # never sees a contact until the administrator has released it.
+    released = db.Column(db.Integer, nullable=False, default=0, server_default="0")
 
 
 class SiteSetting(db.Model):
@@ -161,7 +166,7 @@ def ensure_columns():
     live database upgrades itself on the first start of this version."""
     wanted = {"checkins": (("hour", "INTEGER"), ("school_id", "INTEGER")),
               "support_requests": (("handled", "INTEGER NOT NULL DEFAULT 0"),
-                                   ("school_id", "INTEGER"))}
+                                   ("school_id", "INTEGER"), ("released", "INTEGER NOT NULL DEFAULT 0"))}
     have = inspect(db.engine)
     for table, cols in wanted.items():
         existing = {c["name"] for c in have.get_columns(table)}
@@ -170,6 +175,9 @@ def ensure_columns():
                 continue
             try:  # table and column names are constants above, never user input
                 db.session.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+                if (table, name) == ("support_requests", "released"):
+                    # Requests that existed before this feature were already visible to managers.
+                    db.session.execute(text("UPDATE support_requests SET released = 1"))
                 db.session.commit()
             except SQLAlchemyError:
                 db.session.rollback()  # another worker may have added it a moment ago
@@ -341,7 +349,7 @@ def create_app(config=None):
     @app.before_request
     def gate():
         ep = request.endpoint
-        if ep in (None, "static", "locked", "unlock", "robots", "sitemap"):
+        if ep in (None, "static", "locked", "unlock", "robots", "sitemap", "privacy"):
             return None
         try:
             state = read_state(app.config["LICENSE_SECRET"], app.config["TRIAL_DAYS"])
@@ -423,7 +431,7 @@ def create_app(config=None):
 
     @app.get("/sitemap.xml")
     def sitemap():
-        urls = "".join(f"  <url><loc>{site_url()}{p}</loc></url>\n" for p in ("/", "/checkin"))
+        urls = "".join(f"  <url><loc>{site_url()}{p}</loc></url>\n" for p in ("/", "/checkin", "/privacy"))
         body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls + "</urlset>\n")
         return app.response_class(body, mimetype="application/xml")
@@ -431,6 +439,15 @@ def create_app(config=None):
     @app.route("/")
     def home():
         return render_template("home.html", site=SITE, crisis=get_config()["crisis"])
+
+    @app.get("/privacy")
+    def privacy():
+        cfg = get_config()
+        return render_template(
+            "privacy.html", site=SITE, crisis=cfg["crisis"], org=SITE["org"],
+            odpc_reg=os.environ.get("ODPC_REG_NO", "").strip(),
+            dpo_email=(os.environ.get("DPO_EMAIL", "").strip() or cfg["contacts"].get("email", "")),
+            updated=PRIVACY_UPDATED)
 
     def active_school(slug):
         """The active school for this slug, or None."""

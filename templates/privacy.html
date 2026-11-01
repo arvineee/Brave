@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Privacy policy | Mapenzi ya 30 | #IAMBRAVE{% endblock %}
+{% block robots %}index, follow{% endblock %}
+{% block description %}How Mapenzi ya 30 handles your information, under the Kenya Data Protection Act, 2019 and the Constitution of Kenya.{% endblock %}
+{% block content %}
+<div class="wrap narrow">
+  <header class="page-head">
+    <p class="eyebrow">Mapenzi ya 30</p>
+    <h1>Privacy policy</h1>
+    <p>Last updated {{ updated }}. This policy follows the Data Protection Act, 2019, the regulations made under it, and Articles 31, 35 and 53(2) of the Constitution of Kenya.</p>
+  </header>
+
+  <article class="prose">
+    <h2>In short</h2>
+    <ul>
+      <li>You do not log in, and we never ask for your name.</li>
+      <li>Your check-in answers are saved without any personal details.</li>
+      <li>We keep a contact (phone, email or handle) <strong>only if you type one and tick the consent box</strong>.</li>
+      <li>A contact is first checked by our administrator, and only then passed to your school's manager.</li>
+      <li>You can ask us to show, correct or delete your contact at any time.</li>
+    </ul>
+
+    <h2>Who is responsible for your information</h2>
+    <p>{{ org }}, {{ site.place }} (the "data controller").
+    {% if odpc_reg %}We are registered with the Office of the Data Protection Commissioner (ODPC), registration number {{ odpc_reg }}.{% endif %}
+    {% if dpo_email %}Questions, or requests about your information: <a href="mailto:{{ dpo_email }}">{{ dpo_email }}</a>.{% else %}Questions, or requests about your information: use the contact details in the footer of this page.{% endif %}</p>
+
+    <h2>What we collect, and why</h2>
+    <h3>1. The check-in (anonymous)</h3>
+    <p>The date, the hour of day (Kenya time), your 1 to 5 level, your multiple-choice answers, any extra multiple-choice questions we have added, and which school's QR code you used. We cannot tell who you are from this. We use it to see how students are doing and to plan support. Your level is worked out on your own phone. What you type in the two reflection boxes (questions 5 and 6) stays on your phone: it is never sent to us or stored.</p>
+
+    <h3>2. A support request (only if you choose)</h3>
+    <p>If you type a contact in question 10 <em>and</em> tick the consent box, we save that contact, the kind of support you picked, how you prefer to be reached, the date and your school. It is kept apart from your check-in answers and is not linked to them. Because it shows that you asked for wellbeing support, we treat it as sensitive personal data and protect it accordingly.</p>
+    <p>We use it for one purpose only: to contact you about the support you asked for. Our legal basis is your consent (Data Protection Act, section 30(1)(a)). Leaving a contact is optional, and you get your response either way.</p>
+
+    <h3>3. What we do not collect</h3>
+    <p>No name, no account, no advertising or analytics trackers, no cookies on the public pages, no device fingerprint, and no free text from you. Our hosting provider keeps ordinary server logs (for example, IP address and time of a visit) for security and running the service. We do not use them to identify or profile students. The only cookie on this site is the sign-in cookie for staff, which is set after a staff login and works only under /admin.</p>
+
+    <h2>Who can see your contact</h2>
+    <ul>
+      <li>Our administrator, who checks each request first.</li>
+      <li>The manager of your school, <strong>only after</strong> the administrator has released the request to them. A manager sees requests from their own school and no other.</li>
+      <li>Nobody else. We do not sell, rent or share contacts for marketing. We would disclose one only where the law requires it, or, as the law allows, where it is needed to protect someone's life.</li>
+    </ul>
+
+    <h2>Children and young people</h2>
+    <p>Most people who use this service are students, and many are under 18. We therefore treat all contacts as a child's information and act in the best interests of the child (Constitution, Article 53(2); Data Protection Act, section 33). If you are under 18, please involve a parent, guardian or your school counsellor before you leave a contact. A parent or guardian may at any time ask us to show or delete it.</p>
+
+    <h2>How long we keep it</h2>
+    <p>A contact is kept only as long as it takes to follow up with you. Staff delete it once it has been dealt with, or earlier if you ask. Anonymous check-ins are kept so that schools can follow trends over time, because they cannot be traced to you.</p>
+
+    <h2>Keeping it safe</h2>
+    <p>Contacts are stored separately from check-ins. Only signed-in staff can see them, and each manager is limited to their own school on the server. Passwords are stored only as hashes. The site is served over HTTPS and sets strict security headers. If a breach puts your information at real risk, we will tell the Data Commissioner within 72 hours and tell you as soon as is practicable (Data Protection Act, section 43).</p>
+
+    <h2>Where it is stored</h2>
+    <p>Information is stored with our hosting provider, whose servers may be outside Kenya. We only use hosting with appropriate safeguards for this, as the Data Protection Act requires (sections 48 and 49).</p>
+
+    <h2>Your rights</h2>
+    <p>Under section 26 of the Data Protection Act you may:</p>
+    <ul>
+      <li>be told how your information is used (this policy);</li>
+      <li>ask to see the contact we hold about you;</li>
+      <li>object to its use;</li>
+      <li>ask us to correct it or delete it (section 40);</li>
+      <li>withdraw your consent whenever you like (section 32). Withdrawing does not affect what we did before, and it never affects your access to the check-in or to crisis help.</li>
+    </ul>
+    <p>To use these rights, contact us as shown above and give the contact you typed, so we can find it. We act promptly, and within the time the law allows. Because we hold no names, we may ask you to confirm the contact before we show or change it, so that we never give it to someone else.</p>
+
+    <h2>Your constitutional rights</h2>
+    <p>Article 31 of the Constitution gives everyone the right to privacy, including that information about their private affairs is not unnecessarily required or revealed. Article 35 gives the right to information. Article 53(2) puts a child's best interests first. This service is built to match: it collects the least it can, and asks for personal details only when you choose to give them.</p>
+
+    <h2>Complaints</h2>
+    <p>Please talk to us first, and we will try to put it right. You also have the right to complain to the Office of the Data Protection Commissioner (Data Protection Act, section 56): <a href="https://www.odpc.go.ke" rel="noopener noreferrer" target="_blank">www.odpc.go.ke</a>.</p>
+
+    <h2>Changes</h2>
+    <p>If we change this policy we will update the date at the top of this page.</p>
+
+    <h2>If you need help now</h2>
+    <p>This site is not an emergency service. If you are in crisis, call {{ crisis.helplines[0].name }} on <a href="tel:{{ crisis.helplines[0].phone_tel }}">{{ crisis.helplines[0].phone_display }}</a>.</p>
+  </article>
+</div>
+{% endblock %}

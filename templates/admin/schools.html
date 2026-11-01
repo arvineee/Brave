@@ -73,6 +73,16 @@
       <button class="btn btn-outline adm-small" type="submit">{{ 'Switch off QR code' if s.active else 'Switch on' }}</button>
     </form>
   </div>
+
+  <details class="adm-confirm"><summary class="adm-danger-link">Delete this school</summary>
+    <form method="post" action="{{ url_for('admin_school_delete', sid=s.id) }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <p class="adm-muted">This permanently deletes the school, its {{ managers.get(s.id, [])|length }} manager login(s) and its {{ contact_counts.get(s.id, 0) }} contact(s). Its QR code stops working. This cannot be undone.</p>
+      <label class="check"><input type="checkbox" name="drop_checkins" value="1"><span>Also delete its {{ counts.get(s.id, 0) }} anonymous check-in(s). Left unticked, they are kept as "Unassigned" so your totals stay correct.</span></label>
+      <label class="adm-label" for="dc{{ s.id }}">Type the school name, <strong>{{ s.name }}</strong>, to confirm</label>
+      <input class="adm-input" id="dc{{ s.id }}" name="confirm" type="text" maxlength="80" autocomplete="off" required>
+      <button class="btn adm-small adm-btn-danger" type="submit">Delete {{ s.name }}</button>
+    </form></details>
 </section>
 {% endfor %}
 {% endblock %}

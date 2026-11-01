@@ -252,3 +252,11 @@ a:focus-visible,button:focus-visible{outline:3px solid #134e4a;outline-offset:3p
 
 /* school name shown on a school's check-in page */
 .school-badge{display:inline-block;margin:0 0 10px;padding:6px 14px;border-radius:999px;background:var(--teal-100);color:var(--teal-700);font-size:.95rem}
+.prose{padding-bottom:32px;line-height:1.65}
+.prose h2{margin:32px 0 10px;font-size:1.25rem;color:var(--teal-900)}
+.prose h3{margin:20px 0 6px;font-size:1.05rem}
+.prose p,.prose ul{margin:0 0 14px}
+.prose ul{padding-left:1.2em}
+.prose li{margin-bottom:6px}
+.prose a{color:var(--teal-900);text-decoration:underline}
+.footer-text a{color:#fff;text-decoration:underline}

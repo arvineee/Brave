@@ -167,3 +167,26 @@ Notes
 * `LICENSE_SECRET`, `SITE_URL` and the database stay on the server; the pipeline never sends them.
 * Deleted files are not removed on the server. New dependencies need `pip install -r requirements.txt` in a PythonAnywhere console (the job prints a warning when `requirements.txt` changes).
 * Test locally without uploading: `python scripts/deploy_pythonanywhere.py --dry-run`.
+
+
+## Reviewing contacts before managers see them
+A contact a student leaves (a support request) is first visible **only to the administrator**.
+Admin, **Support requests**, "Review before school managers see them": tick requests and "Push
+ticked", use "Push to manager" on one request, or "Push all waiting" (respects the school picker).
+Delete a request there instead of pushing it if it should not go on. "Take back from manager"
+hides a pushed request again. Requests from the general link have no school, so there is no manager
+to receive them. Managers, and the manager's report counts, include only pushed requests.
+Requests that existed before this feature were treated as already pushed on upgrade.
+
+## Deleting a school
+Admin, **Schools**, "Delete this school": type the school's name to confirm. This always deletes the
+school, its managers and its contacts. Its anonymous check-ins are kept as "Unassigned" unless
+"Also delete its check-ins" is ticked. It cannot be undone.
+
+## Privacy policy (`/privacy`)
+Public page, linked from every footer and from the consent box in question 10. It is written
+against the Data Protection Act, 2019 and Articles 31, 35 and 53(2) of the Constitution. Set these
+in the server environment so it names the real controller:
+* `ODPC_REG_NO`  your ODPC registration number (the sentence is shown only when this is set)
+* `DPO_EMAIL`    contact for privacy requests (defaults to the footer email in Contacts)
+Update `PRIVACY_UPDATED` in `app.py` whenever `templates/privacy.html` changes.
